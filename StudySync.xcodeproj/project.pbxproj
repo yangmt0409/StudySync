@@ -6,14 +6,165 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		442D703B2F6A576A009B09F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703A2F6A576A009B09F0 /* WidgetKit.framework */; };
+		442D703D2F6A576A009B09F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703C2F6A576A009B09F0 /* SwiftUI.framework */; };
+		442D70482F6A576B009B09F0 /* StudySyncWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 442D70382F6A576A009B09F0 /* StudySyncWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		442D70B92F6B014C009B09F0 /* StudySyncWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 442D70AF2F6B014A009B09F0 /* StudySyncWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		442D70C32F6B0194009B09F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703A2F6A576A009B09F0 /* WidgetKit.framework */; };
+		442D70C42F6B0194009B09F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703C2F6A576A009B09F0 /* SwiftUI.framework */; };
+		442D70CF2F6B0195009B09F0 /* StudySyncWatchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 442D70C22F6B0194009B09F0 /* StudySyncWatchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		447A002C2F805DB700982D96 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 447A002B2F805DB700982D96 /* FirebaseAuth */; };
+		447A002E2F805DB700982D96 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 447A002D2F805DB700982D96 /* FirebaseCore */; };
+		447A00302F805DB700982D96 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 447A002F2F805DB700982D96 /* FirebaseFirestore */; };
+		447A00592F80949A00982D96 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 447A00582F80949A00982D96 /* FirebaseMessaging */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		442D70462F6A576B009B09F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 442D6FF52F6A4E35009B09F0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 442D70372F6A576A009B09F0;
+			remoteInfo = StudySyncWidgetExtension;
+		};
+		442D70B72F6B014C009B09F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 442D6FF52F6A4E35009B09F0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 442D70AE2F6B014A009B09F0;
+			remoteInfo = "StudySyncWatch Watch App";
+		};
+		442D70CD2F6B0195009B09F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 442D6FF52F6A4E35009B09F0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 442D70C12F6B0194009B09F0;
+			remoteInfo = StudySyncWatchWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		442D704D2F6A576B009B09F0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				442D70482F6A576B009B09F0 /* StudySyncWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70BD2F6B014C009B09F0 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				442D70B92F6B014C009B09F0 /* StudySyncWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70D42F6B0195009B09F0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				442D70CF2F6B0195009B09F0 /* StudySyncWatchWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		442D6FFD2F6A4E35009B09F0 /* StudySync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StudySync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		442D70382F6A576A009B09F0 /* StudySyncWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StudySyncWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		442D703A2F6A576A009B09F0 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		442D703C2F6A576A009B09F0 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		442D70612F6A59EF009B09F0 /* StudySyncWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StudySyncWidgetExtension.entitlements; sourceTree = "<group>"; };
+		442D70AF2F6B014A009B09F0 /* StudySyncWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "StudySyncWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		442D70C22F6B0194009B09F0 /* StudySyncWatchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StudySyncWatchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		442D70492F6A576B009B09F0 /* Exceptions for "StudySyncWidget" folder in "StudySyncWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */;
+		};
+		442D70592F6A587E009B09F0 /* Exceptions for "StudySync" folder in "StudySyncWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Extensions/Color+Hex.swift",
+				"Extensions/Date+Extensions.swift",
+				Extensions/L10n.swift,
+				Models/CountdownEvent.swift,
+				Models/DeadlineRecord.swift,
+				Models/EventCategory.swift,
+				Models/ThemeModels.swift,
+				Models/UserSettings.swift,
+			);
+			target = 442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */;
+		};
+		442D705F2F6A58B2009B09F0 /* Exceptions for "StudySyncWidget" folder in "StudySync" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SharedModelContainer.swift,
+			);
+			target = 442D6FFC2F6A4E35009B09F0 /* StudySync */;
+		};
+		442D70D32F6B0195009B09F0 /* Exceptions for "StudySyncWatchWidgets" folder in "StudySyncWatchWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 442D70C12F6B0194009B09F0 /* StudySyncWatchWidgetsExtension */;
+		};
+		446EECE92F6B71B6002FC8B1 /* Exceptions for "StudySync" folder in "StudySync" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 442D6FFC2F6A4E35009B09F0 /* StudySync */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		442D6FFF2F6A4E35009B09F0 /* StudySync */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				446EECE92F6B71B6002FC8B1 /* Exceptions for "StudySync" folder in "StudySync" target */,
+				442D70592F6A587E009B09F0 /* Exceptions for "StudySync" folder in "StudySyncWidgetExtension" target */,
+			);
 			path = StudySync;
+			sourceTree = "<group>";
+		};
+		442D703E2F6A576A009B09F0 /* StudySyncWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				442D705F2F6A58B2009B09F0 /* Exceptions for "StudySyncWidget" folder in "StudySync" target */,
+				442D70492F6A576B009B09F0 /* Exceptions for "StudySyncWidget" folder in "StudySyncWidgetExtension" target */,
+			);
+			path = StudySyncWidget;
+			sourceTree = "<group>";
+		};
+		442D70B02F6B014A009B09F0 /* StudySyncWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "StudySyncWatch Watch App";
+			sourceTree = "<group>";
+		};
+		442D70C52F6B0194009B09F0 /* StudySyncWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				442D70D32F6B0195009B09F0 /* Exceptions for "StudySyncWatchWidgets" folder in "StudySyncWatchWidgetsExtension" target */,
+			);
+			path = StudySyncWatchWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +174,35 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				447A00592F80949A00982D96 /* FirebaseMessaging in Frameworks */,
+				447A002E2F805DB700982D96 /* FirebaseCore in Frameworks */,
+				447A002C2F805DB700982D96 /* FirebaseAuth in Frameworks */,
+				447A00302F805DB700982D96 /* FirebaseFirestore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70352F6A576A009B09F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				442D703D2F6A576A009B09F0 /* SwiftUI.framework in Frameworks */,
+				442D703B2F6A576A009B09F0 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70AC2F6B014A009B09F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70BF2F6B0194009B09F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				442D70C42F6B0194009B09F0 /* SwiftUI.framework in Frameworks */,
+				442D70C32F6B0194009B09F0 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -32,7 +212,12 @@
 		442D6FF42F6A4E35009B09F0 = {
 			isa = PBXGroup;
 			children = (
+				442D70612F6A59EF009B09F0 /* StudySyncWidgetExtension.entitlements */,
 				442D6FFF2F6A4E35009B09F0 /* StudySync */,
+				442D703E2F6A576A009B09F0 /* StudySyncWidget */,
+				442D70B02F6B014A009B09F0 /* StudySyncWatch Watch App */,
+				442D70C52F6B0194009B09F0 /* StudySyncWatchWidgets */,
+				442D70392F6A576A009B09F0 /* Frameworks */,
 				442D6FFE2F6A4E35009B09F0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +226,20 @@
 			isa = PBXGroup;
 			children = (
 				442D6FFD2F6A4E35009B09F0 /* StudySync.app */,
+				442D70382F6A576A009B09F0 /* StudySyncWidgetExtension.appex */,
+				442D70AF2F6B014A009B09F0 /* StudySyncWatch Watch App.app */,
+				442D70C22F6B0194009B09F0 /* StudySyncWatchWidgetsExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		442D70392F6A576A009B09F0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				442D703A2F6A576A009B09F0 /* WidgetKit.framework */,
+				442D703C2F6A576A009B09F0 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,20 +252,96 @@
 				442D6FF92F6A4E35009B09F0 /* Sources */,
 				442D6FFA2F6A4E35009B09F0 /* Frameworks */,
 				442D6FFB2F6A4E35009B09F0 /* Resources */,
+				442D704D2F6A576B009B09F0 /* Embed Foundation Extensions */,
+				442D70BD2F6B014C009B09F0 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				442D70472F6A576B009B09F0 /* PBXTargetDependency */,
+				442D70B82F6B014C009B09F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				442D6FFF2F6A4E35009B09F0 /* StudySync */,
 			);
 			name = StudySync;
 			packageProductDependencies = (
+				447A002B2F805DB700982D96 /* FirebaseAuth */,
+				447A002D2F805DB700982D96 /* FirebaseCore */,
+				447A002F2F805DB700982D96 /* FirebaseFirestore */,
+				447A00582F80949A00982D96 /* FirebaseMessaging */,
 			);
 			productName = StudySync;
 			productReference = 442D6FFD2F6A4E35009B09F0 /* StudySync.app */;
 			productType = "com.apple.product-type.application";
+		};
+		442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 442D704A2F6A576B009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWidgetExtension" */;
+			buildPhases = (
+				442D70342F6A576A009B09F0 /* Sources */,
+				442D70352F6A576A009B09F0 /* Frameworks */,
+				442D70362F6A576A009B09F0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				442D703E2F6A576A009B09F0 /* StudySyncWidget */,
+			);
+			name = StudySyncWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = StudySyncWidgetExtension;
+			productReference = 442D70382F6A576A009B09F0 /* StudySyncWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		442D70AE2F6B014A009B09F0 /* StudySyncWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 442D70BA2F6B014C009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWatch Watch App" */;
+			buildPhases = (
+				442D70AB2F6B014A009B09F0 /* Sources */,
+				442D70AC2F6B014A009B09F0 /* Frameworks */,
+				442D70AD2F6B014A009B09F0 /* Resources */,
+				442D70D42F6B0195009B09F0 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				442D70CE2F6B0195009B09F0 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				442D70B02F6B014A009B09F0 /* StudySyncWatch Watch App */,
+			);
+			name = "StudySyncWatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "StudySyncWatch Watch App";
+			productReference = 442D70AF2F6B014A009B09F0 /* StudySyncWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		442D70C12F6B0194009B09F0 /* StudySyncWatchWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 442D70D02F6B0195009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWatchWidgetsExtension" */;
+			buildPhases = (
+				442D70BE2F6B0194009B09F0 /* Sources */,
+				442D70BF2F6B0194009B09F0 /* Frameworks */,
+				442D70C02F6B0194009B09F0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				442D70C52F6B0194009B09F0 /* StudySyncWatchWidgets */,
+			);
+			name = StudySyncWatchWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = StudySyncWatchWidgetsExtension;
+			productReference = 442D70C22F6B0194009B09F0 /* StudySyncWatchWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,29 +356,67 @@
 					442D6FFC2F6A4E35009B09F0 = {
 						CreatedOnToolsVersion = 26.3;
 					};
+					442D70372F6A576A009B09F0 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					442D70AE2F6B014A009B09F0 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					442D70C12F6B0194009B09F0 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 				};
 			};
 			buildConfigurationList = 442D6FF82F6A4E35009B09F0 /* Build configuration list for PBXProject "StudySync" */;
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hant",
+				"zh-Hans",
 			);
 			mainGroup = 442D6FF42F6A4E35009B09F0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 442D6FFE2F6A4E35009B09F0 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				442D6FFC2F6A4E35009B09F0 /* StudySync */,
+				442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */,
+				442D70AE2F6B014A009B09F0 /* StudySyncWatch Watch App */,
+				442D70C12F6B0194009B09F0 /* StudySyncWatchWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		442D6FFB2F6A4E35009B09F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70362F6A576A009B09F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70AD2F6B014A009B09F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70C02F6B0194009B09F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +433,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		442D70342F6A576A009B09F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70AB2F6B014A009B09F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		442D70BE2F6B0194009B09F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		442D70472F6A576B009B09F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */;
+			targetProxy = 442D70462F6A576B009B09F0 /* PBXContainerItemProxy */;
+		};
+		442D70B82F6B014C009B09F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 442D70AE2F6B014A009B09F0 /* StudySyncWatch Watch App */;
+			targetProxy = 442D70B72F6B014C009B09F0 /* PBXContainerItemProxy */;
+		};
+		442D70CE2F6B0195009B09F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 442D70C12F6B0194009B09F0 /* StudySyncWatchWidgetsExtension */;
+			targetProxy = 442D70CD2F6B0195009B09F0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		442D70082F6A4E37009B09F0 /* Debug */ = {
@@ -249,20 +599,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = StudySync/StudySync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySync/Info.plist;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "StudySync 需要访问你的日历来显示课程和事件的实时倒计时。";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -280,20 +636,26 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = StudySync/StudySync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySync/Info.plist;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "StudySync 需要访问你的日历来显示课程和事件的实时倒计时。";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -303,6 +665,202 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		442D704B2F6A576B009B09F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = StudySyncWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySyncWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.StudySyncWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		442D704C2F6A576B009B09F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = StudySyncWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySyncWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.StudySyncWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		442D70BB2F6B014C009B09F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = PlumsXD.StudySync;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		442D70BC2F6B014C009B09F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = PlumsXD.StudySync;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		442D70D12F6B0195009B09F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySyncWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWatchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp.StudySyncWatchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		442D70D22F6B0195009B09F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = B62JS4J237;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StudySyncWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StudySyncWatchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp.StudySyncWatchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -327,7 +885,68 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		442D704A2F6A576B009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				442D704B2F6A576B009B09F0 /* Debug */,
+				442D704C2F6A576B009B09F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		442D70BA2F6B014C009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				442D70BB2F6B014C009B09F0 /* Debug */,
+				442D70BC2F6B014C009B09F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		442D70D02F6B0195009B09F0 /* Build configuration list for PBXNativeTarget "StudySyncWatchWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				442D70D12F6B0195009B09F0 /* Debug */,
+				442D70D22F6B0195009B09F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.11.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		447A002B2F805DB700982D96 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		447A002D2F805DB700982D96 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		447A002F2F805DB700982D96 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		447A00582F80949A00982D96 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 447A002A2F805DB700982D96 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 442D6FF52F6A4E35009B09F0 /* Project object */;
 }
