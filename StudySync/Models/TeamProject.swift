@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseFirestore
 
 // MARK: - Team Project
 
@@ -531,6 +532,79 @@ struct MeetupMemberLocation: Codable, Identifiable {
         try c.encodeIfPresent(etaTransitSeconds, forKey: .etaTransitSeconds)
         try c.encodeIfPresent(etaWalkingSeconds, forKey: .etaWalkingSeconds)
         try c.encode(updatedAt, forKey: .updatedAt)
+    }
+}
+
+// MARK: - Group Focus Session
+
+struct GroupFocusRoom: Codable, Identifiable {
+    var id: String                  // room ID (UUID)
+    var hostUid: String
+    var hostName: String
+    var hostEmoji: String
+    var durationMinutes: Int
+    var focusEmoji: String
+    var status: String              // "waiting" | "running" | "completed"
+    var startedAt: Date?
+    var createdAt: Date
+    var memberUids: [String]        // includes host
+
+    // Members' live state
+    var members: [GroupFocusMember]
+
+    var isWaiting: Bool { status == "waiting" }
+    var isRunning: Bool { status == "running" }
+    var isCompleted: Bool { status == "completed" }
+
+    var elapsedSeconds: Int {
+        guard let startedAt, isRunning else { return 0 }
+        return Int(Date().timeIntervalSince(startedAt))
+    }
+
+    var remainingSeconds: Int {
+        max(durationMinutes * 60 - elapsedSeconds, 0)
+    }
+
+    var progress: Double {
+        guard durationMinutes > 0 else { return 0 }
+        return min(Double(elapsedSeconds) / Double(durationMinutes * 60), 1.0)
+    }
+}
+
+struct GroupFocusMember: Codable, Identifiable {
+    var id: String              // uid
+    var displayName: String
+    var avatarEmoji: String
+    var status: String          // "ready" | "focusing" | "completed" | "gaveUp"
+
+    var isReady: Bool { status == "ready" }
+    var isFocusing: Bool { status == "focusing" }
+    var isCompleted: Bool { status == "completed" }
+    var gaveUp: Bool { status == "gaveUp" }
+}
+
+// MARK: - Study Room Member
+
+struct StudyRoomMember: Codable, Identifiable {
+    var id: String              // uid
+    var displayName: String
+    var avatarEmoji: String
+    var focusEmoji: String      // the emoji they chose for their focus session
+    var focusDurationMinutes: Int
+    var startedAt: Date
+    var updatedAt: Date
+
+    var elapsedMinutes: Int {
+        Int(Date().timeIntervalSince(startedAt)) / 60
+    }
+
+    var remainingMinutes: Int {
+        max(focusDurationMinutes - elapsedMinutes, 0)
+    }
+
+    var progress: Double {
+        guard focusDurationMinutes > 0 else { return 0 }
+        return min(Double(elapsedMinutes) / Double(focusDurationMinutes), 1.0)
     }
 }
 

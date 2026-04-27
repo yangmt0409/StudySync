@@ -7,13 +7,17 @@ struct CalendarFeedView: View {
     var manager = CalendarManager.shared
     var urgencyEngine = UrgencyEngine.shared
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Query private var deadlineRecords: [DeadlineRecord]
+    @Query(sort: \TravelEvent.departureTimeLocal, order: .forward)
+    private var allTravelEvents: [TravelEvent]
 
     @State private var now = Date()
     @State private var isVisible = false
 
     // Sheets
     @State private var showAddEvent = false
+    @State private var showAddTravel = false
     @State private var editingEvent: EKEvent?
     @State private var showDeleteAlert = false
     @State private var showDeleteSpanAlert = false
@@ -21,6 +25,39 @@ struct CalendarFeedView: View {
 
     // Navigation
     @State private var selectedEvent: EKEvent?
+    @State private var selectedTravel: TravelEvent?
+
+    /// Filter travel events to upcoming or in-progress only.
+    private var upcomingTravel: [TravelEvent] {
+        allTravelEvents.filter { !$0.markedComplete && $0.arrivalInstant > Date().addingTimeInterval(-3600) }
+    }
+
+    /// Map of "next leg id → connection" for fast O(1) lookup while we
+    /// render. A `TravelEvent.id` is in this dict iff it's the SECOND leg
+    /// of a layover pair detected by `TravelConnectionDetector`. Used by
+    /// `dayItemRow(.travel:)` and the bottom "更多行程" section to pin a
+    /// connection banner above the second card.
+    private var connectionsByNextId: [UUID: TravelConnection] {
+        TravelConnectionDetector.indexByNextId(events: upcomingTravel)
+    }
+
+    /// Trips whose departure day falls on `date` (user's current calendar TZ).
+    /// Used to interleave trips into per-day calendar sections.
+    private func travelForDay(_ date: Date) -> [TravelEvent] {
+        let cal = Calendar.current
+        return upcomingTravel.filter { cal.isDate($0.departureInstant, inSameDayAs: date) }
+    }
+
+    /// Trips whose departure day isn't covered by any visible day-group.
+    /// Shown in a compact "更多行程" section at the bottom so they aren't lost
+    /// when the user's `calendarDayRange` is shorter than their planning horizon.
+    private func laterTravel(visibleDates: [Date]) -> [TravelEvent] {
+        let cal = Calendar.current
+        let visibleDays = Set(visibleDates.map { cal.startOfDay(for: $0) })
+        return upcomingTravel.filter { trip in
+            !visibleDays.contains(cal.startOfDay(for: trip.departureInstant))
+        }
+    }
 
     // Toast
     @State private var toastMessage: String?
@@ -73,19 +110,34 @@ struct CalendarFeedView: View {
             .navigationDestination(item: $selectedEvent) { event in
                 CalendarEventDetailView(event: event)
             }
+            .navigationDestination(item: $selectedTravel) { travel in
+                TravelDetailView(event: travel)
+            }
             .navigationTitle(L10n.calendar)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                if manager.hasWriteAccess {
-                    ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        if manager.hasWriteAccess {
+                            Button {
+                                showAddEvent = true
+                                HapticEngine.shared.selection()
+                            } label: {
+                                Label(String(localized: "添加日历事件"),
+                                      systemImage: "calendar.badge.plus")
+                            }
+                        }
                         Button {
-                            showAddEvent = true
+                            showAddTravel = true
                             HapticEngine.shared.selection()
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(SSColor.brand)
+                            Label(String(localized: "添加行程"),
+                                  systemImage: "airplane")
                         }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(SSColor.brand)
                     }
                 }
             }
@@ -96,6 +148,13 @@ struct CalendarFeedView: View {
                     manager.fetchUpcomingEvents()
                 }
                 updateUrgency()
+                // Kick off a travel status refresh in the background
+                Task { await TravelStatusRefresher.shared.refreshUpcoming(using: modelContext) }
+            }
+            .task {
+                // Pull travel events from Firestore on tab appearance.
+                // Restores trips after reinstall / new device login.
+                await TravelEventSyncService.shared.pullAll(context: modelContext)
             }
             .onDisappear {
                 isVisible = false
@@ -106,6 +165,8 @@ struct CalendarFeedView: View {
                 if manager.authorizationStatus == .fullAccess {
                     manager.fetchUpcomingEvents()
                 }
+                // Refresh real-time status for upcoming flights on foreground
+                Task { await TravelStatusRefresher.shared.refreshUpcoming(using: modelContext) }
             }
             .onReceive(minuteTimer) { _ in
                 guard isVisible else { return }
@@ -122,6 +183,9 @@ struct CalendarFeedView: View {
                 AddCalendarEventView {
                     showToastMessage(L10n.calEventCreated)
                 }
+            }
+            .sheet(isPresented: $showAddTravel) {
+                AddTravelView()
             }
             .sheet(item: $editingEvent) { event in
                 AddCalendarEventView(editingEvent: event) {
@@ -173,8 +237,12 @@ struct CalendarFeedView: View {
             .listRowSeparator(.hidden)
 
             let groups = manager.groupedByDay()
+            let laterTrips = laterTravel(visibleDates: groups.map(\.date))
+            let allEmpty = groups.allSatisfy { group in
+                group.events.isEmpty && travelForDay(group.date).isEmpty
+            } && laterTrips.isEmpty
 
-            if groups.allSatisfy({ $0.events.isEmpty }) {
+            if allEmpty {
                 Section {
                     emptyState
                 }
@@ -182,8 +250,11 @@ struct CalendarFeedView: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+                    let dayTrips = travelForDay(group.date)
+                    let items = mergedDayItems(events: group.events, travel: dayTrips)
                     Section {
-                        // Section header
+                        // Section header — count includes both calendar events
+                        // and trips so the badge reflects what the user sees.
                         HStack {
                             Text(group.title)
                                 .font(SSFont.bodySmallSemibold)
@@ -191,7 +262,7 @@ struct CalendarFeedView: View {
 
                             Spacer()
 
-                            Text("\(group.events.count)")
+                            Text("\(items.count)")
                                 .font(SSFont.footnote)
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 8)
@@ -202,7 +273,7 @@ struct CalendarFeedView: View {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 16))
 
-                        if group.events.isEmpty {
+                        if items.isEmpty {
                             HStack {
                                 Spacer()
                                 Text(L10n.noSchedule)
@@ -214,14 +285,38 @@ struct CalendarFeedView: View {
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         } else {
-                            let sorted = sortEvents(group.events)
-                            ForEach(sorted, id: \.eventIdentifier) { event in
-                                eventRow(event)
+                            ForEach(items) { item in
+                                dayItemRow(item)
                                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                             }
                         }
+                    }
+                }
+
+                // Trips beyond the visible day range — not pinned at top; we
+                // surface them at the very bottom so they remain discoverable
+                // without hijacking the "today" view.
+                if !laterTrips.isEmpty {
+                    Section {
+                        ForEach(laterTrips) { travel in
+                            travelRow(travel)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "airplane")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(String(localized: "更多行程"))
+                                .font(SSFont.bodySmallSemibold)
+                        }
+                        .foregroundStyle(.secondary)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
                 }
             }
@@ -235,17 +330,52 @@ struct CalendarFeedView: View {
         }
     }
 
-    // MARK: - Sort (completed deadlines to bottom)
+    // MARK: - Day item merge + sort
 
-    private func sortEvents(_ events: [EKEvent]) -> [EKEvent] {
-        events.sorted { a, b in
-            let aCompleted = completedDeadlineIds.contains(a.eventIdentifier)
-            let bCompleted = completedDeadlineIds.contains(b.eventIdentifier)
-            if aCompleted != bCompleted { return !aCompleted }
-
-            // All-day first
+    /// Merge calendar events + travel events for a single day into one
+    /// time-ordered list. Ordering rules (applied in this priority):
+    ///   1. Completed deadlines fall to the bottom (matches prior behavior).
+    ///   2. All-day calendar events float to the top of the non-completed
+    ///      group (trips are never all-day).
+    ///   3. Everything else sorts by start time — calendar uses `startDate`,
+    ///      travel uses `departureInstant`.
+    private func mergedDayItems(events: [EKEvent], travel: [TravelEvent]) -> [DayItem] {
+        let items: [DayItem] = events.map { .calendar($0) }
+            + travel.map { .travel($0) }
+        return items.sorted { a, b in
+            if a.isCompletedDeadline(completedDeadlineIds) !=
+                b.isCompletedDeadline(completedDeadlineIds) {
+                return !a.isCompletedDeadline(completedDeadlineIds)
+            }
             if a.isAllDay != b.isAllDay { return a.isAllDay }
-            return a.startDate < b.startDate
+            return a.sortTime < b.sortTime
+        }
+    }
+
+    @ViewBuilder
+    private func dayItemRow(_ item: DayItem) -> some View {
+        switch item {
+        case .calendar(let event):
+            eventRow(event)
+        case .travel(let travel):
+            travelRow(travel)
+        }
+    }
+
+    /// Travel card with an optional connection banner on top.
+    /// The banner is pinned ABOVE the card (same tap target sequence as
+    /// the surrounding event rows) and only renders if this trip is the
+    /// next leg of a detected layover within 18h.
+    @ViewBuilder
+    private func travelRow(_ travel: TravelEvent) -> some View {
+        VStack(spacing: 0) {
+            if let connection = connectionsByNextId[travel.id] {
+                TravelConnectionBanner(connection: connection)
+            }
+            Button { selectedTravel = travel } label: {
+                TravelCardView(event: travel)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -618,47 +748,30 @@ struct CalendarFeedView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 60)
-            Image(systemName: "calendar.badge.checkmark")
-                .font(SSFont.displayIcon)
-                .foregroundStyle(.secondary)
-            Text(L10n.noRecentSchedule)
-                .font(SSFont.heading3)
-                .foregroundStyle(.secondary)
-            Text(L10n.enjoyFreeTime)
-                .font(SSFont.secondary)
-                .foregroundStyle(.tertiary)
-
-            Button {
+        SSEmptyStateView(
+            systemImage: "calendar.badge.checkmark",
+            title: L10n.noRecentSchedule,
+            subtitle: L10n.enjoyFreeTime,
+            iconColor: SSColor.brand,
+            cta: .init(label: L10n.calAddCalEvent) {
                 showAddEvent = true
                 HapticEngine.shared.lightImpact()
-            } label: {
-                Label(L10n.calAddCalEvent, systemImage: "plus")
-                    .font(SSFont.bodySmallSemibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(SSColor.brand))
             }
-            .padding(.top, SSSpacing.md)
-
-            Spacer()
-        }
+        )
     }
 
     // MARK: - Request Access View
 
     private var requestAccessView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: ipScaled(24, sizeClass: hSizeClass)) {
             Spacer()
             Image(systemName: "calendar.circle.fill")
-                .font(.system(size: 64))
+                .font(.system(size: ipScaled(64, sizeClass: hSizeClass)))
                 .foregroundStyle(SSColor.brand)
             Text(L10n.connectCalendar)
-                .font(SSFont.heading1)
+                .font(.system(size: ipScaled(24, sizeClass: hSizeClass), weight: .bold))
             Text(L10n.calendarAccessDescription)
-                .font(SSFont.bodySmallMedium)
+                .font(.system(size: ipScaled(15, sizeClass: hSizeClass), weight: .medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -666,10 +779,10 @@ struct CalendarFeedView: View {
                 Task { await manager.requestAccess() }
             } label: {
                 Text(L10n.allowAccess)
-                    .font(SSFont.heading3)
+                    .font(.system(size: ipScaled(17, sizeClass: hSizeClass), weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, ipScaled(14, sizeClass: hSizeClass))
                     .background(
                         RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                             .fill(SSColor.brand)
@@ -678,20 +791,21 @@ struct CalendarFeedView: View {
             .padding(.horizontal, 40)
             Spacer()
         }
+        .readableContentWidth(520)
     }
 
     // MARK: - Denied View
 
     private var deniedView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: ipScaled(24, sizeClass: hSizeClass)) {
             Spacer()
             Image(systemName: "calendar.badge.exclamationmark")
-                .font(.system(size: 64))
+                .font(.system(size: ipScaled(64, sizeClass: hSizeClass)))
                 .foregroundStyle(.orange)
             Text(L10n.calendarDenied)
-                .font(SSFont.heading1)
+                .font(.system(size: ipScaled(24, sizeClass: hSizeClass), weight: .bold))
             Text(L10n.openSettings)
-                .font(SSFont.bodySmallMedium)
+                .font(.system(size: ipScaled(15, sizeClass: hSizeClass), weight: .medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -701,10 +815,10 @@ struct CalendarFeedView: View {
                 }
             } label: {
                 Text(L10n.goToSettings)
-                    .font(SSFont.heading3)
+                    .font(.system(size: ipScaled(17, sizeClass: hSizeClass), weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, ipScaled(14, sizeClass: hSizeClass))
                     .background(
                         RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                             .fill(.orange)
@@ -713,6 +827,7 @@ struct CalendarFeedView: View {
             .padding(.horizontal, 40)
             Spacer()
         }
+        .readableContentWidth(520)
     }
 
     // MARK: - Helpers
@@ -727,6 +842,40 @@ struct CalendarFeedView: View {
 // Make EKEvent identifiable for .sheet(item:)
 extension EKEvent: @retroactive Identifiable {
     public var id: String { eventIdentifier }
+}
+
+/// Unified row type for the calendar feed — a row is either a calendar event
+/// or a `TravelEvent`. Used so we can interleave trips with calendar items on
+/// the same day and sort everything by time.
+fileprivate enum DayItem: Identifiable {
+    case calendar(EKEvent)
+    case travel(TravelEvent)
+
+    var id: String {
+        switch self {
+        case .calendar(let e): return "cal-\(e.eventIdentifier)"
+        case .travel(let t):   return "trv-\(t.persistentModelID.hashValue)"
+        }
+    }
+
+    var sortTime: Date {
+        switch self {
+        case .calendar(let e): return e.startDate
+        case .travel(let t):   return t.departureInstant
+        }
+    }
+
+    var isAllDay: Bool {
+        if case .calendar(let e) = self { return e.isAllDay }
+        return false
+    }
+
+    func isCompletedDeadline(_ completedIds: Set<String>) -> Bool {
+        if case .calendar(let e) = self {
+            return completedIds.contains(e.eventIdentifier)
+        }
+        return false
+    }
 }
 
 #Preview {

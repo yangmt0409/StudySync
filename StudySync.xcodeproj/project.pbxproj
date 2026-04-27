@@ -10,7 +10,6 @@
 		442D703B2F6A576A009B09F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703A2F6A576A009B09F0 /* WidgetKit.framework */; };
 		442D703D2F6A576A009B09F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703C2F6A576A009B09F0 /* SwiftUI.framework */; };
 		442D70482F6A576B009B09F0 /* StudySyncWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 442D70382F6A576A009B09F0 /* StudySyncWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		442D70B92F6B014C009B09F0 /* StudySyncWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 442D70AF2F6B014A009B09F0 /* StudySyncWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		442D70C32F6B0194009B09F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703A2F6A576A009B09F0 /* WidgetKit.framework */; };
 		442D70C42F6B0194009B09F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 442D703C2F6A576A009B09F0 /* SwiftUI.framework */; };
 		442D70CF2F6B0195009B09F0 /* StudySyncWatchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 442D70C22F6B0194009B09F0 /* StudySyncWatchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -27,13 +26,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = 442D70372F6A576A009B09F0;
 			remoteInfo = StudySyncWidgetExtension;
-		};
-		442D70B72F6B014C009B09F0 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 442D6FF52F6A4E35009B09F0 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 442D70AE2F6B014A009B09F0;
-			remoteInfo = "StudySyncWatch Watch App";
 		};
 		442D70CD2F6B0195009B09F0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -54,17 +46,6 @@
 				442D70482F6A576B009B09F0 /* StudySyncWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		442D70BD2F6B014C009B09F0 /* Embed Watch Content */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
-			files = (
-				442D70B92F6B014C009B09F0 /* StudySyncWatch Watch App.app in Embed Watch Content */,
-			);
-			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		442D70D42F6B0195009B09F0 /* Embed Foundation Extensions */ = {
@@ -108,6 +89,12 @@
 				Models/DeadlineRecord.swift,
 				Models/EventCategory.swift,
 				Models/ThemeModels.swift,
+				Models/TravelEvent.swift,
+				Models/TravelImportSource.swift,
+				Models/TravelKind.swift,
+				Models/TravelReminderPreset.swift,
+				Models/TravelSegment.swift,
+				Models/TravelStatus.swift,
 				Models/UserSettings.swift,
 			);
 			target = 442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */;
@@ -253,13 +240,11 @@
 				442D6FFA2F6A4E35009B09F0 /* Frameworks */,
 				442D6FFB2F6A4E35009B09F0 /* Resources */,
 				442D704D2F6A576B009B09F0 /* Embed Foundation Extensions */,
-				442D70BD2F6B014C009B09F0 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				442D70472F6A576B009B09F0 /* PBXTargetDependency */,
-				442D70B82F6B014C009B09F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				442D6FFF2F6A4E35009B09F0 /* StudySync */,
@@ -375,6 +360,8 @@
 				Base,
 				"zh-Hant",
 				"zh-Hans",
+				ko,
+				ja,
 			);
 			mainGroup = 442D6FF42F6A4E35009B09F0;
 			minimizedProjectReferenceProxies = 1;
@@ -461,11 +448,6 @@
 			isa = PBXTargetDependency;
 			target = 442D70372F6A576A009B09F0 /* StudySyncWidgetExtension */;
 			targetProxy = 442D70462F6A576B009B09F0 /* PBXContainerItemProxy */;
-		};
-		442D70B82F6B014C009B09F0 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 442D70AE2F6B014A009B09F0 /* StudySyncWatch Watch App */;
-			targetProxy = 442D70B72F6B014C009B09F0 /* PBXContainerItemProxy */;
 		};
 		442D70CE2F6B0195009B09F0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -601,7 +583,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = StudySync/StudySync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -618,7 +600,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -638,7 +620,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = StudySync/StudySync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -655,7 +637,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -675,7 +657,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = StudySyncWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StudySyncWidget/Info.plist;
@@ -687,7 +669,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.StudySyncWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -707,7 +689,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = StudySyncWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StudySyncWidget/Info.plist;
@@ -719,7 +701,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.StudySyncWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -738,7 +720,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -749,7 +731,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -771,7 +753,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -782,7 +764,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -804,7 +786,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StudySyncWatchWidgets/Info.plist;
@@ -816,7 +798,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp.StudySyncWatchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -837,7 +819,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B62JS4J237;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StudySyncWatchWidgets/Info.plist;
@@ -849,7 +831,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = PlumsXD.StudySync.watchkitapp.StudySyncWatchWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

@@ -18,6 +18,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         // Register for remote notifications (APNs)
         application.registerForRemoteNotifications()
 
+        // Cache App Store storefront country code for region-gated features
+        // (e.g., hide AI Monitor tab in China per Apple review requirements)
+        Task { await StorefrontService.refresh() }
+
         return true
     }
 

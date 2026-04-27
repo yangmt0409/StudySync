@@ -125,29 +125,20 @@ final class MeetupLocationService: NSObject {
               let profile = AuthService.shared.userProfile else { return }
 
         let blurred = Self.blurCoordinate(location.coordinate)
-
-        let memberLocation = MeetupMemberLocation(
-            id: profile.id,
-            displayName: profile.displayName,
-            avatarEmoji: profile.avatarEmoji,
-            approxLatitude: blurred.latitude,
-            approxLongitude: blurred.longitude,
-            sharingLocation: isSharingLocation,
-            updatedAt: Date()
-        )
+        let dest = destination
 
         Task {
-            // Upload basic info first
-            await firestore.updateMeetupLocation(projectId: projectId, location: memberLocation)
+            // Calculate ETAs first (before writing to Firestore) to avoid
+            // a double-write that would flash nil ETAs to other members.
+            var drivingETA: Int?
+            var transitETA: Int?
+            var walkingETA: Int?
 
-            // Calculate all 3 ETAs in parallel, then update
-            if let dest = destination {
+            if let dest {
                 let etas = await calculateAllETAs(from: location.coordinate, to: dest)
-                var updated = memberLocation
-                updated.etaDrivingSeconds = etas.driving
-                updated.etaTransitSeconds = etas.transit
-                updated.etaWalkingSeconds = etas.walking
-                await firestore.updateMeetupLocation(projectId: projectId, location: updated)
+                drivingETA = etas.driving
+                transitETA = etas.transit
+                walkingETA = etas.walking
 
                 // Store locally for instant display
                 await MainActor.run {
@@ -159,6 +150,21 @@ final class MeetupLocationService: NSObject {
                 // Update Live Activity with fresh ETAs
                 updateLiveActivity(etas: etas)
             }
+
+            // Single Firestore write with complete data (location + ETAs)
+            let memberLocation = MeetupMemberLocation(
+                id: profile.id,
+                displayName: profile.displayName,
+                avatarEmoji: profile.avatarEmoji,
+                approxLatitude: blurred.latitude,
+                approxLongitude: blurred.longitude,
+                sharingLocation: isSharingLocation,
+                etaDrivingSeconds: drivingETA,
+                etaTransitSeconds: transitETA,
+                etaWalkingSeconds: walkingETA,
+                updatedAt: Date()
+            )
+            await firestore.updateMeetupLocation(projectId: projectId, location: memberLocation)
         }
     }
 
@@ -291,12 +297,12 @@ final class MeetupLocationService: NSObject {
 
         let directions = MKDirections(request: request)
         do {
-            let response = try await directions.calculate()
-            if let route = response.routes.first {
-                return Int(route.expectedTravelTime)
-            }
+            // Use calculateETA() instead of calculate() — it's a lightweight
+            // request that only returns travel time, without needing a full
+            // route. Much more reliable for transit & walking.
+            let eta = try await directions.calculateETA()
+            return Int(eta.expectedTravelTime)
         } catch {
-            // Transit / walking may not be available in all areas
             debugPrint("[MeetupLocation] ETA failed for \(transport): \(error.localizedDescription)")
         }
         return nil

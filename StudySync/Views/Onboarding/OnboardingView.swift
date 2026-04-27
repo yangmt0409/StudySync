@@ -10,6 +10,7 @@ import SwiftUI
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @State private var currentPage = 0
     @State private var notificationGranted: Bool?
@@ -20,7 +21,7 @@ struct OnboardingView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(hex: "#5B7FFF").opacity(0.12),
+                    SSColor.brand.opacity(SSOpacity.tagBackground),
                     Color(hex: "#A78BFA").opacity(0.05)
                 ],
                 startPoint: .topLeading,
@@ -36,12 +37,12 @@ struct OnboardingView: View {
                         Button(L10n.onboardingSkip) {
                             complete()
                         }
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: ipScaled(15, sizeClass: hSizeClass), weight: .medium))
                         .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
+                .padding(.horizontal, SSSpacing.xxxl)
+                .padding(.top, SSSpacing.md)
                 .frame(height: 44)
 
                 // Pages
@@ -55,11 +56,11 @@ struct OnboardingView: View {
                 .animation(.easeInOut(duration: 0.3), value: currentPage)
 
                 // Dots + primary button
-                VStack(spacing: 20) {
-                    HStack(spacing: 8) {
+                VStack(spacing: SSSpacing.xxl) {
+                    HStack(spacing: SSSpacing.md) {
                         ForEach(0..<totalPages, id: \.self) { i in
                             Circle()
-                                .fill(i == currentPage ? Color(hex: "#5B7FFF") : Color.secondary.opacity(0.3))
+                                .fill(i == currentPage ? SSColor.brand : Color.secondary.opacity(0.3))
                                 .frame(width: 8, height: 8)
                                 .scaleEffect(i == currentPage ? 1.2 : 1.0)
                                 .animation(.spring(duration: 0.3), value: currentPage)
@@ -71,36 +72,37 @@ struct OnboardingView: View {
                 .padding(.horizontal, 32)
                 .padding(.bottom, 40)
             }
+            .readableContentWidth(600)
         }
     }
 
     // MARK: - Pages
 
     private var welcomePage: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: SSSpacing.xxxl) {
             Spacer()
 
             Image(systemName: "sparkles")
-                .font(.system(size: 72))
+                .font(.system(size: ipScaled(72, sizeClass: hSizeClass)))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color(hex: "#5B7FFF"), Color(hex: "#A78BFA")],
+                        colors: [SSColor.brand, Color(hex: "#A78BFA")],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .symbolEffect(.pulse)
 
-            VStack(spacing: 12) {
+            VStack(spacing: SSSpacing.lg) {
                 Text(L10n.onboardingWelcomeTitle)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: ipScaled(28, sizeClass: hSizeClass), weight: .bold))
                     .multilineTextAlignment(.center)
 
                 Text(L10n.onboardingWelcomeSubtitle)
-                    .font(.system(size: 16))
+                    .font(.system(size: ipScaled(16, sizeClass: hSizeClass)))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, SSSpacing.xxxl)
             }
 
             Spacer()
@@ -108,12 +110,12 @@ struct OnboardingView: View {
     }
 
     private var featuresPage: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: SSSpacing.xxxl) {
             Spacer().frame(height: 20)
 
             Text(L10n.onboardingFeaturesTitle)
-                .font(.system(size: 26, weight: .bold))
-                .padding(.horizontal, 24)
+                .font(.system(size: ipScaled(26, sizeClass: hSizeClass), weight: .bold))
+                .padding(.horizontal, SSSpacing.xxxl)
 
             VStack(spacing: 18) {
                 featureRow(
@@ -141,44 +143,44 @@ struct OnboardingView: View {
                     desc: L10n.onboardingFeatureTeamDesc
                 )
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
 
             Spacer()
         }
     }
 
     private var notificationsPage: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: SSSpacing.xxxl) {
             Spacer()
 
             Image(systemName: "bell.badge.fill")
-                .font(.system(size: 72))
+                .font(.system(size: ipScaled(72, sizeClass: hSizeClass)))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color.orange, Color(hex: "#FF6B6B")],
+                        colors: [Color.orange, SSColor.visa],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
 
-            VStack(spacing: 12) {
+            VStack(spacing: SSSpacing.lg) {
                 Text(L10n.onboardingNotifTitle)
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: ipScaled(26, sizeClass: hSizeClass), weight: .bold))
                     .multilineTextAlignment(.center)
 
                 Text(L10n.onboardingNotifSubtitle)
-                    .font(.system(size: 15))
+                    .font(.system(size: ipScaled(15, sizeClass: hSizeClass)))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
 
             if let granted = notificationGranted {
-                HStack(spacing: 6) {
+                HStack(spacing: SSSpacing.sm) {
                     Image(systemName: granted ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .foregroundStyle(granted ? .green : .secondary)
                     Text(granted ? L10n.onboardingNotifGranted : L10n.onboardingNotifDenied)
-                        .font(.system(size: 14))
+                        .font(.system(size: ipScaled(14, sizeClass: hSizeClass)))
                         .foregroundStyle(.secondary)
                 }
                 .transition(.opacity)
@@ -189,27 +191,27 @@ struct OnboardingView: View {
     }
 
     private var readyPage: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: SSSpacing.xxxl) {
             Spacer()
 
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 80))
+                .font(.system(size: ipScaled(80, sizeClass: hSizeClass)))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.green, Color(hex: "#4ECDC4")],
+                        colors: [.green, SSColor.travel],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .symbolEffect(.bounce, value: currentPage)
 
-            VStack(spacing: 12) {
+            VStack(spacing: SSSpacing.lg) {
                 Text(L10n.onboardingReadyTitle)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: ipScaled(28, sizeClass: hSizeClass), weight: .bold))
                     .multilineTextAlignment(.center)
 
                 Text(L10n.onboardingReadySubtitle)
-                    .font(.system(size: 15))
+                    .font(.system(size: ipScaled(15, sizeClass: hSizeClass)))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -222,21 +224,24 @@ struct OnboardingView: View {
     // MARK: - Components
 
     private func featureRow(icon: String, color: String, title: String, desc: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: SSSpacing.lgXl) {
             Image(systemName: icon)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: ipScaled(22, sizeClass: hSizeClass), weight: .semibold))
                 .foregroundStyle(Color(hex: color))
-                .frame(width: 44, height: 44)
+                .frame(
+                    width: ipScaled(44, sizeClass: hSizeClass),
+                    height: ipScaled(44, sizeClass: hSizeClass)
+                )
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(hex: color).opacity(0.15))
+                    RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
+                        .fill(Color(hex: color).opacity(SSOpacity.lightTint))
                 )
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: SSSpacing.xs) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: ipScaled(16, sizeClass: hSizeClass), weight: .semibold))
                 Text(desc)
-                    .font(.system(size: 13))
+                    .font(.system(size: ipScaled(13, sizeClass: hSizeClass)))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -250,15 +255,15 @@ struct OnboardingView: View {
             handlePrimaryTap()
         } label: {
             Text(primaryButtonTitle)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: ipScaled(17, sizeClass: hSizeClass), weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, ipScaled(16, sizeClass: hSizeClass))
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: "#5B7FFF"), Color(hex: "#A78BFA")],
+                                colors: [SSColor.brand, Color(hex: "#A78BFA")],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )

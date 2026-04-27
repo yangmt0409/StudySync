@@ -4,6 +4,7 @@ import SwiftData
 struct TodoListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @Query(filter: #Predicate<TodoItem> { $0.isCompleted == false },
            sort: \TodoItem.createdAt, order: .reverse)
@@ -18,9 +19,18 @@ struct TodoListView: View {
     @State private var showCompleted = false
     @State private var hasAppeared = false
     @State private var showClearAlert = false
+    @State private var selectedCourse: String? = nil
+
+    /// Unique non-nil course names from all active todos, sorted alphabetically.
+    private var activeCourseNames: [String] {
+        Array(Set(activeTodos.compactMap(\.courseName))).sorted()
+    }
 
     private var sortedActive: [TodoItem] {
-        activeTodos.sorted { a, b in
+        let filtered = selectedCourse == nil
+            ? activeTodos
+            : activeTodos.filter { $0.courseName == selectedCourse }
+        return filtered.sorted { a, b in
             if a.priority.sortOrder != b.priority.sortOrder {
                 return a.priority.sortOrder < b.priority.sortOrder
             }
@@ -41,6 +51,11 @@ struct TodoListView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
+                        // Course filter bar — only show when there are tagged todos
+                        if !activeCourseNames.isEmpty {
+                            courseFilterBar
+                        }
+
                         if activeTodos.isEmpty && completedTodos.isEmpty {
                             emptyState
                         } else {
@@ -97,52 +112,73 @@ struct TodoListView: View {
             .onAppear {
                 withAnimation(.spring(duration: 0.5)) { hasAppeared = true }
             }
+            .task {
+                // Pull todos from Firestore on tab appearance to restore
+                // state after reinstall / new device login. Same pattern
+                // as HomeView pulls CountdownEvents.
+                await TodoItemSyncService.shared.pullAll(context: modelContext)
+            }
             .animation(.spring(duration: 0.3), value: activeTodos.count)
             .animation(.spring(duration: 0.3), value: completedTodos.count)
         }
     }
 
+    // MARK: - Course Filter Bar
+
+    private var courseFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // "All" chip
+                Button {
+                    selectedCourse = nil
+                    HapticEngine.shared.selection()
+                } label: {
+                    Text(L10n.todoAllCourses)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(selectedCourse == nil ? .white : SSColor.brand)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(selectedCourse == nil ? SSColor.brand : SSColor.brand.opacity(0.12))
+                        )
+                }
+
+                ForEach(activeCourseNames, id: \.self) { name in
+                    let isSelected = selectedCourse == name
+                    Button {
+                        selectedCourse = isSelected ? nil : name
+                        HapticEngine.shared.selection()
+                    } label: {
+                        Text(name)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(isSelected ? .white : SSColor.brand)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(isSelected ? SSColor.brand : SSColor.brand.opacity(0.12))
+                            )
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+            .padding(.horizontal, SSSpacing.xl)
+        }
+        .padding(.horizontal, -SSSpacing.xl) // bleed past outer padding
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 60)
-
-            Image(systemName: "checklist")
-                .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
-
-            Text(L10n.todoEmpty)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            Text(L10n.todoEmptyDesc)
-                .font(.system(size: 14))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-
-            Button {
+        SSEmptyStateView(
+            systemImage: "checklist",
+            title: L10n.todoEmpty,
+            subtitle: L10n.todoEmptyDesc,
+            iconColor: SSColor.brand,
+            cta: .init(label: L10n.todoAdd) {
                 showingAddTodo = true
                 HapticEngine.shared.lightImpact()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .bold))
-                    Text(L10n.todoAdd)
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(
-                    Capsule().fill(SSColor.brand)
-                )
             }
-            .padding(.top, 8)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
+        )
     }
 
     private var allDoneState: some View {
@@ -226,11 +262,14 @@ struct TodoListView: View {
             todo.completedAt = todo.isCompleted ? Date() : nil
             HapticEngine.shared.lightImpact()
         }
+        TodoItemSyncService.shared.pushTodo(todo)
     }
 
     private func clearCompleted() {
         for todo in completedTodos {
+            let todoId = todo.id
             modelContext.delete(todo)
+            TodoItemSyncService.shared.deleteTodo(id: todoId)
         }
     }
 }
@@ -272,6 +311,19 @@ struct TodoRowView: View {
                             .font(.system(size: 11))
                     }
                     .foregroundStyle(Color(hex: todo.priority.colorHex))
+
+                    // Course chip
+                    if let course = todo.courseName, !course.isEmpty {
+                        Text(course)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(SSColor.brand)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule().fill(SSColor.brand.opacity(0.12))
+                            )
+                            .lineLimit(1)
+                    }
 
                     // Due date
                     if let days = todo.daysRemaining {

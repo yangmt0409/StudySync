@@ -19,7 +19,14 @@ final class FirestoreService {
 
     func getUserProfile(uid: String) async -> UserProfile? {
         do {
-            let doc = try await db.collection("users").document(uid).getDocument()
+            // 10s timeout: this is on the login-blocking path (signIn →
+            // loadProfile → getUserProfile). Firestore hits googleapis.com
+            // which is blocked in mainland China — without this the login
+            // UI freezes for ~75s. See AsyncTimeout.swift.
+            let database = self.db
+            let doc = try await withTimeout(seconds: 10) {
+                try await database.collection("users").document(uid).getDocument()
+            }
             return try doc.data(as: UserProfile.self)
         } catch {
             return nil
@@ -405,6 +412,36 @@ final class FirestoreService {
         }
     }
 
+    /// Push a user's updated `roles` array into every friend's cached `FriendInfo`.
+    /// Firestore mirrors the user's roles into `users/{friend}/friends/{uid}.roles`
+    /// so friend lists show a Pro tag without refetching. When the role changes
+    /// (e.g. Pro expires), we propagate here so peers don't see stale tags.
+    ///
+    /// Best-effort: errors per-friend are logged but don't abort the rest.
+    func propagateRolesToFriends(uid: String, roles: [String]) async {
+        // 1. List our own friends
+        let friendUids: [String]
+        do {
+            let snapshot = try await db.collection("users").document(uid)
+                .collection("friends").getDocuments()
+            friendUids = snapshot.documents.map { $0.documentID }
+        } catch {
+            debugPrint("[Firestore] propagateRolesToFriends list error: \(error)")
+            return
+        }
+
+        // 2. Update the cached FriendInfo in each friend's subcollection
+        for friendUid in friendUids {
+            do {
+                try await db.collection("users").document(friendUid)
+                    .collection("friends").document(uid)
+                    .updateData(["roles": roles])
+            } catch {
+                debugPrint("[Firestore] propagate roles to \(friendUid) error: \(error)")
+            }
+        }
+    }
+
     // MARK: - Availability Timeline
 
     /// Fetch a single day's availability slots for a user.
@@ -457,6 +494,272 @@ final class FirestoreService {
                 .delete()
         } catch {
             debugPrint("[Firestore] deleteAvailability error: \(error)")
+        }
+    }
+
+    // MARK: - Study Room
+
+    func joinStudyRoom(member: StudyRoomMember) async {
+        do {
+            let data = try Firestore.Encoder().encode(member)
+            try await db.collection("studyRoom").document(member.id).setData(data)
+        } catch {
+            debugPrint("[Firestore] joinStudyRoom error: \(error)")
+        }
+    }
+
+    func leaveStudyRoom(uid: String) async {
+        do {
+            try await db.collection("studyRoom").document(uid).delete()
+        } catch {
+            debugPrint("[Firestore] leaveStudyRoom error: \(error)")
+        }
+    }
+
+    func listenToStudyRoom(onChange: @escaping ([StudyRoomMember]) -> Void) -> ListenerRegistration {
+        return db.collection("studyRoom")
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    debugPrint("[Firestore] listenToStudyRoom error: \(error)")
+                }
+                let members = snapshot?.documents.compactMap {
+                    try? $0.data(as: StudyRoomMember.self)
+                } ?? []
+                Task { @MainActor in onChange(members) }
+            }
+    }
+
+    // MARK: - Group Focus
+
+    func createGroupFocus(room: GroupFocusRoom) async {
+        do {
+            try db.collection("groupFocus").document(room.id).setData(from: room)
+            debugPrint("[Firestore] createGroupFocus success: \(room.id)")
+        } catch {
+            debugPrint("[Firestore] createGroupFocus error: \(error)")
+        }
+    }
+
+    func joinGroupFocus(roomId: String, member: GroupFocusMember) async {
+        do {
+            let data = try Firestore.Encoder().encode(member)
+            try await db.collection("groupFocus").document(roomId).updateData([
+                "memberUids": FieldValue.arrayUnion([member.id]),
+                "members": FieldValue.arrayUnion([data])
+            ])
+        } catch {
+            debugPrint("[Firestore] joinGroupFocus error: \(error)")
+        }
+    }
+
+    func startGroupFocus(roomId: String) async {
+        do {
+            try await db.collection("groupFocus").document(roomId).updateData([
+                "status": "running",
+                "startedAt": FieldValue.serverTimestamp()
+            ])
+        } catch {
+            debugPrint("[Firestore] startGroupFocus error: \(error)")
+        }
+    }
+
+    func updateGroupFocusMemberStatus(roomId: String, uid: String, status: String) async {
+        let ref = db.collection("groupFocus").document(roomId)
+        do {
+            _ = try await db.runTransaction { transaction, errorPointer in
+                let doc: DocumentSnapshot
+                do {
+                    doc = try transaction.getDocument(ref)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                guard var room = try? doc.data(as: GroupFocusRoom.self) else { return nil }
+                if let idx = room.members.firstIndex(where: { $0.id == uid }) {
+                    room.members[idx].status = status
+                }
+                let allDone = room.members.allSatisfy { $0.status == "completed" || $0.status == "gaveUp" }
+                var updates: [String: Any] = [:]
+                if let membersData = try? room.members.map({ try Firestore.Encoder().encode($0) }) {
+                    updates["members"] = membersData
+                }
+                if allDone {
+                    updates["status"] = "completed"
+                }
+                transaction.updateData(updates, forDocument: ref)
+                return nil
+            }
+        } catch {
+            debugPrint("[Firestore] updateGroupFocusMemberStatus error: \(error)")
+        }
+    }
+
+    func leaveGroupFocus(roomId: String, uid: String) async {
+        let ref = db.collection("groupFocus").document(roomId)
+        do {
+            _ = try await db.runTransaction { transaction, errorPointer in
+                let doc: DocumentSnapshot
+                do {
+                    doc = try transaction.getDocument(ref)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                guard var room = try? doc.data(as: GroupFocusRoom.self) else { return nil }
+                room.members.removeAll { $0.id == uid }
+                room.memberUids.removeAll { $0 == uid }
+                if let membersData = try? room.members.map({ try Firestore.Encoder().encode($0) }) {
+                    transaction.updateData([
+                        "members": membersData,
+                        "memberUids": room.memberUids
+                    ], forDocument: ref)
+                }
+                return nil
+            }
+        } catch {
+            debugPrint("[Firestore] leaveGroupFocus error: \(error)")
+        }
+    }
+
+    func deleteGroupFocus(roomId: String) async {
+        do {
+            try await db.collection("groupFocus").document(roomId).delete()
+        } catch {
+            debugPrint("[Firestore] deleteGroupFocus error: \(error)")
+        }
+    }
+
+    func listenToGroupFocus(roomId: String, onChange: @escaping (GroupFocusRoom?) -> Void) -> ListenerRegistration {
+        return db.collection("groupFocus").document(roomId)
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    debugPrint("[Firestore] listenToGroupFocus error: \(error)")
+                }
+                guard let snapshot, snapshot.exists else {
+                    Task { @MainActor in onChange(nil) }
+                    return
+                }
+                do {
+                    let room = try snapshot.data(as: GroupFocusRoom.self)
+                    Task { @MainActor in onChange(room) }
+                } catch {
+                    debugPrint("[Firestore] listenToGroupFocus decode error: \(error)")
+                    Task { @MainActor in onChange(nil) }
+                }
+            }
+    }
+
+    func fetchActiveGroupFocusRooms() async -> [GroupFocusRoom] {
+        do {
+            let snapshot = try await db.collection("groupFocus")
+                .whereField("status", in: ["waiting", "running"])
+                .limit(to: 20)
+                .getDocuments()
+            return snapshot.documents.compactMap { try? $0.data(as: GroupFocusRoom.self) }
+                .sorted { $0.createdAt > $1.createdAt }
+        } catch {
+            debugPrint("[Firestore] fetchActiveGroupFocusRooms error: \(error)")
+            return []
+        }
+    }
+
+    // MARK: - Account Deletion
+
+    /// Delete ALL Firestore data associated with a user.
+    /// Removes: main user doc + all subcollections (friends, friendRequests, sharedDues,
+    /// availability, focusStats, etc.), studyRoom presence, and membership in groupFocus rooms.
+    /// Also removes the user from OTHER users' friends subcollections (reciprocal cleanup).
+    ///
+    /// This runs best-effort: each cleanup step is isolated so one failure doesn't block others.
+    /// Firebase Auth deletion is performed separately by the caller AFTER this completes.
+    func deleteAllUserData(uid: String) async {
+        // 1. Collect friend UIDs BEFORE deleting our own friends subcollection,
+        //    so we can reciprocally remove ourselves from their friend lists.
+        var friendUids: [String] = []
+        do {
+            let snapshot = try await db.collection("users").document(uid)
+                .collection("friends").getDocuments()
+            friendUids = snapshot.documents.map { $0.documentID }
+        } catch {
+            debugPrint("[Firestore] deleteAllUserData list friends error: \(error)")
+        }
+
+        // 2. Remove self from each friend's friends subcollection
+        for friendUid in friendUids {
+            do {
+                try await db.collection("users").document(friendUid)
+                    .collection("friends").document(uid).delete()
+            } catch {
+                debugPrint("[Firestore] reciprocal friend removal error for \(friendUid): \(error)")
+            }
+        }
+
+        // 3. Delete all subcollections under users/{uid}
+        let subcollections = [
+            "friends", "friendRequests", "sentFriendRequests",
+            "sharedDues", "availability", "focusStats",
+            "checkIns", "studyGoals", "countdowns", "todos",
+            "projectInvites", "notifications"
+        ]
+        for sub in subcollections {
+            await deleteSubcollection(path: "users/\(uid)/\(sub)")
+        }
+
+        // 4. Delete main user doc
+        do {
+            try await db.collection("users").document(uid).delete()
+        } catch {
+            debugPrint("[Firestore] delete main user doc error: \(error)")
+        }
+
+        // 5. Delete studyRoom presence
+        do {
+            try await db.collection("studyRoom").document(uid).delete()
+        } catch {
+            debugPrint("[Firestore] delete studyRoom error: \(error)")
+        }
+
+        // 6. Remove self from any groupFocus rooms we're in (leave but keep room alive for others)
+        do {
+            let snapshot = try await db.collection("groupFocus")
+                .whereField("memberUids", arrayContains: uid)
+                .getDocuments()
+            for doc in snapshot.documents {
+                await leaveGroupFocus(roomId: doc.documentID, uid: uid)
+            }
+        } catch {
+            debugPrint("[Firestore] leave groupFocus rooms error: \(error)")
+        }
+    }
+
+    /// Recursively delete all documents under a collection path.
+    /// Firestore has no native "delete collection" — we must list + batch delete.
+    private func deleteSubcollection(path: String) async {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 3 else { return }
+        // parts: ["users", uid, "subcollection"]
+        let ref = db.collection(parts[0]).document(parts[1]).collection(parts[2])
+        do {
+            let snapshot = try await ref.getDocuments()
+            // Use batched writes (Firestore limit: 500 ops per batch)
+            let chunks = snapshot.documents.chunked(into: 450)
+            for chunk in chunks {
+                let batch = db.batch()
+                for doc in chunk {
+                    batch.deleteDocument(doc.reference)
+                }
+                try await batch.commit()
+            }
+        } catch {
+            debugPrint("[Firestore] deleteSubcollection \(path) error: \(error)")
+        }
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }

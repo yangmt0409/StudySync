@@ -11,6 +11,7 @@ final class TodoItem {
     var completedAt: Date?
     var priorityRaw: String = "medium"
     var dueDate: Date?
+    var courseName: String?
     var createdAt: Date = Date()
 
     init(title: String = "", note: String = "", emoji: String = "📌",

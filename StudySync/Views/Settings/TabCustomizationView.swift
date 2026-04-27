@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TabCustomizationView: View {
-    @State private var movableTabs: [AppTab] = AppTab.allCases.filter { $0 != .schedule && !TabManager.pinnedTailTabs.contains($0) }
+    @State private var movableTabs: [AppTab] = AppTab.availableCases.filter { $0 != .schedule && !TabManager.pinnedTailTabs.contains($0) }
     @State private var mainCount: Int = TabManager.shared.mainTabCount
     @State private var showingResetAlert = false
 

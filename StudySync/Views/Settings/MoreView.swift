@@ -8,7 +8,7 @@ struct MoreView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(spacing: SSSpacing.lg) {
                         NavigationLink {
                             SettingsView()
                         } label: {
@@ -24,14 +24,14 @@ struct MoreView: View {
                         } label: {
                             moreRow(
                                 icon: "info.circle.fill",
-                                iconColor: Color(hex: "#5B7FFF"),
+                                iconColor: SSColor.brand,
                                 title: L10n.about
                             )
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, SSSpacing.xl)
+                    .padding(.top, SSSpacing.md)
+                    .padding(.bottom, SSSpacing.xxl)
                 }
             }
             .navigationTitle(L10n.more)
@@ -39,26 +39,26 @@ struct MoreView: View {
     }
 
     private func moreRow(icon: String, iconColor: Color, title: String) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: SSSpacing.lgXl) {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundStyle(iconColor)
                 .frame(width: 32)
 
             Text(title)
-                .font(.system(size: 16, weight: .medium))
+                .font(SSFont.bodyMedium)
                 .foregroundStyle(.primary)
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+                .font(SSFont.sectionHeader)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, SSSpacing.xl)
+        .padding(.vertical, SSSpacing.lgXl)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }

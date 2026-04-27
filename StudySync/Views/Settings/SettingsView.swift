@@ -295,6 +295,19 @@ struct SettingsView: View {
                     }
                 }
 
+                // 数据导出
+                Section {
+                    NavigationLink {
+                        DataExportView()
+                    } label: {
+                        Label(L10n.dataExport, systemImage: "square.and.arrow.up")
+                    }
+                } header: {
+                    Text(L10n.dataExport)
+                } footer: {
+                    Text(L10n.dataExportFooter)
+                }
+
                 // 关于
                 Section(L10n.about) {
                     HStack {
@@ -317,7 +330,7 @@ struct SettingsView: View {
             }
             .navigationTitle(L10n.tabSettings)
             .navigationBarTitleDisplayMode(.large)
-            .sheet(isPresented: $showingPaywall) {
+            .fullScreenCover(isPresented: $showingPaywall) {
                 PaywallView()
             }
             .alert(L10n.iCloudSyncRestartTitle, isPresented: $showingRestartAlert) {

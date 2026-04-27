@@ -4,6 +4,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Query(sort: \CountdownEvent.createdAt, order: .reverse) private var events: [CountdownEvent]
     @Bindable var viewModel: EventViewModel
 
@@ -35,93 +36,108 @@ struct HomeView: View {
                         let (category, categoryEvents) = pair
                         Section {
                             if !viewModel.isSectionCollapsed(category) {
-                                ForEach(Array(categoryEvents.enumerated()), id: \.element.id) { cardIndex, event in
-                                    EventCardView(
-                                        event: event,
-                                        onTogglePin: {
-                                            withAnimation(.spring(duration: 0.3)) {
-                                                event.isPinned.toggle()
+                                if hSizeClass == .regular {
+                                    // iPad: 2-column fixed grid when section has 2+ events
+                                    // (cards become half-width, dot pattern visually less
+                                    // dense for long countdowns). With a single event the
+                                    // grid would leave column 2 visibly empty — fall back to
+                                    // a full-row card so the layout doesn't look abandoned.
+                                    // Either way, EventCardView's iPad path uses 12 dot
+                                    // columns instead of 20, which is the main fix for the
+                                    // 180+-day "wall of dots" trypophobia issue.
+                                    // Why fixed `.flexible()` columns instead of `.adaptive`:
+                                    // adaptive collapses to 1 column inside List rows
+                                    // because List doesn't propagate a finite width hint
+                                    // the way ScrollView does. Fixed flexible always splits.
+                                    // Swipe actions are intentionally dropped on iPad
+                                    // (uncommon UX); long-press contextMenu handles edit/
+                                    // pin/delete.
+                                    if categoryEvents.count > 1 {
+                                        LazyVGrid(
+                                            columns: [
+                                                GridItem(.flexible(), spacing: 12),
+                                                GridItem(.flexible(), spacing: 12)
+                                            ],
+                                            spacing: 12
+                                        ) {
+                                            ForEach(categoryEvents, id: \.id) { event in
+                                                cardWithContextMenu(event)
                                             }
-                                            CountdownEventSyncService.shared.pushEvent(event)
-                                            HapticManager.light()
-                                        },
-                                        onDelete: {
-                                            // M1 fix: Route through confirmation dialog
-                                            eventToDelete = event
-                                            showDeleteAlert = true
-                                            HapticManager.warning()
                                         }
-                                    )
-                                    .onTapGesture {
-                                        viewModel.eventToEdit = event
-                                        HapticEngine.shared.selection()
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                    } else if let event = categoryEvents.first {
+                                        // Single event in section: constrain card to
+                                        // iPhone-natural width (~520pt) centered in the
+                                        // List row. Without this constraint the card
+                                        // would stretch full iPad width and the 12-dot-col
+                                        // pattern produces ~100pt circles ("mosaic tile"
+                                        // look). Centered iPhone-width card matches the
+                                        // dot-density feel of the 2-column grid path.
+                                        HStack(spacing: 0) {
+                                            Spacer(minLength: 0)
+                                            cardWithContextMenu(event)
+                                                .frame(maxWidth: 520)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
                                     }
-                                    // #10 Context menu
-                                    .contextMenu {
-                                        Button {
-                                            viewModel.eventToEdit = event
-                                        } label: {
-                                            Label(L10n.editEvent, systemImage: "pencil")
-                                        }
-
-                                        Button {
-                                            withAnimation(.spring(duration: 0.3)) {
-                                                event.isPinned.toggle()
+                                } else {
+                                    ForEach(Array(categoryEvents.enumerated()), id: \.element.id) { cardIndex, event in
+                                        cardWithContextMenu(event)
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                Button(role: .destructive) {
+                                                    eventToDelete = event
+                                                    showDeleteAlert = true
+                                                    HapticManager.warning()
+                                                } label: {
+                                                    Label(L10n.delete, systemImage: "trash")
+                                                }
                                             }
-                                            HapticManager.light()
-                                        } label: {
-                                            Label(
-                                                event.isPinned ? L10n.unpin : L10n.pin,
-                                                systemImage: event.isPinned ? "pin.slash" : "pin.fill"
+                                            .swipeActions(edge: .leading) {
+                                                Button {
+                                                    withAnimation(.spring(duration: 0.3)) {
+                                                        event.isPinned.toggle()
+                                                    }
+                                                    HapticManager.light()
+                                                } label: {
+                                                    Label(
+                                                        event.isPinned ? L10n.unpin : L10n.pin,
+                                                        systemImage: event.isPinned ? "pin.slash" : "pin.fill"
+                                                    )
+                                                }
+                                                .tint(.orange)
+                                            }
+                                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                            .listRowBackground(Color.clear)
+                                            .listRowSeparator(.hidden)
+                                            .opacity(hasAppeared ? 1 : 0)
+                                            .offset(y: hasAppeared ? 0 : 20)
+                                            .animation(
+                                                .spring(duration: 0.5).delay(Double(sectionIndex * 2 + cardIndex) * 0.06),
+                                                value: hasAppeared
                                             )
-                                        }
-
-                                        Divider()
-
-                                        Button(role: .destructive) {
-                                            eventToDelete = event
-                                            showDeleteAlert = true
-                                            HapticManager.warning()
-                                        } label: {
-                                            Label(L10n.deleteEvent, systemImage: "trash")
-                                        }
                                     }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        Button(role: .destructive) {
-                                            eventToDelete = event
-                                            showDeleteAlert = true
-                                            HapticManager.warning()
-                                        } label: {
-                                            Label(L10n.delete, systemImage: "trash")
-                                        }
-                                    }
-                                    .swipeActions(edge: .leading) {
-                                        Button {
-                                            withAnimation(.spring(duration: 0.3)) {
-                                                event.isPinned.toggle()
-                                            }
-                                            HapticManager.light()
-                                        } label: {
-                                            Label(
-                                                event.isPinned ? L10n.unpin : L10n.pin,
-                                                systemImage: event.isPinned ? "pin.slash" : "pin.fill"
-                                            )
-                                        }
-                                        .tint(.orange)
-                                    }
-                                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
-                                    .opacity(hasAppeared ? 1 : 0)
-                                    .offset(y: hasAppeared ? 0 : 20)
-                                    .animation(
-                                        .spring(duration: 0.5).delay(Double(sectionIndex * 2 + cardIndex) * 0.06),
-                                        value: hasAppeared
-                                    )
                                 }
                             }
                         } header: {
-                            sectionHeader(category: category, count: categoryEvents.count)
+                            if hSizeClass == .regular {
+                                // Mirror the centered 520pt-wide card layout below so the
+                                // section header (Academic / Visa / etc.) sits flush left
+                                // with the card's left edge instead of pinning to the
+                                // iPad screen's far left.
+                                HStack(spacing: 0) {
+                                    Spacer(minLength: 0)
+                                    sectionHeader(category: category, count: categoryEvents.count)
+                                        .frame(maxWidth: 520)
+                                    Spacer(minLength: 0)
+                                }
+                            } else {
+                                sectionHeader(category: category, count: categoryEvents.count)
+                            }
                         }
                     }
                 }
@@ -147,7 +163,7 @@ struct HomeView: View {
             .sheet(isPresented: $viewModel.showingAddEvent) {
                 AddEventView()
             }
-            .sheet(isPresented: $viewModel.showingPaywall) {
+            .fullScreenCover(isPresented: $viewModel.showingPaywall) {
                 PaywallView()
             }
             .sheet(item: $viewModel.eventToEdit) { event in
@@ -223,6 +239,60 @@ struct HomeView: View {
             }
             .padding(.horizontal, SSSpacing.xxl)
             .padding(.vertical, SSSpacing.xs)
+        }
+    }
+
+    // MARK: - Event Card (shared between iPhone List rows and iPad LazyVGrid cells)
+
+    @ViewBuilder
+    private func cardWithContextMenu(_ event: CountdownEvent) -> some View {
+        EventCardView(
+            event: event,
+            onTogglePin: {
+                withAnimation(.spring(duration: 0.3)) {
+                    event.isPinned.toggle()
+                }
+                CountdownEventSyncService.shared.pushEvent(event)
+                HapticManager.light()
+            },
+            onDelete: {
+                eventToDelete = event
+                showDeleteAlert = true
+                HapticManager.warning()
+            }
+        )
+        .onTapGesture {
+            viewModel.eventToEdit = event
+            HapticEngine.shared.selection()
+        }
+        .contextMenu {
+            Button {
+                viewModel.eventToEdit = event
+            } label: {
+                Label(L10n.editEvent, systemImage: "pencil")
+            }
+
+            Button {
+                withAnimation(.spring(duration: 0.3)) {
+                    event.isPinned.toggle()
+                }
+                HapticManager.light()
+            } label: {
+                Label(
+                    event.isPinned ? L10n.unpin : L10n.pin,
+                    systemImage: event.isPinned ? "pin.slash" : "pin.fill"
+                )
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                eventToDelete = event
+                showDeleteAlert = true
+                HapticManager.warning()
+            } label: {
+                Label(L10n.deleteEvent, systemImage: "trash")
+            }
         }
     }
 

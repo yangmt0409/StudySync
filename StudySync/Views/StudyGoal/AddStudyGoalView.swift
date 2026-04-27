@@ -4,6 +4,7 @@ import SwiftData
 struct AddStudyGoalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @State private var title = ""
     @State private var emoji = "📚"
@@ -34,7 +35,7 @@ struct AddStudyGoalView: View {
 
                 // Emoji picker
                 Section {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                    LazyVGrid(columns: iPadGridColumns(iPhone: 6, spacing: 8, sizeClass: hSizeClass), spacing: 12) {
                         ForEach(emojiOptions, id: \.self) { option in
                             Button {
                                 emoji = option
@@ -64,7 +65,7 @@ struct AddStudyGoalView: View {
 
                 // Color picker
                 Section {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                    LazyVGrid(columns: iPadGridColumns(iPhone: 6, spacing: 8, sizeClass: hSizeClass), spacing: 12) {
                         ForEach(colorOptions, id: \.self) { hex in
                             Button {
                                 colorHex = hex

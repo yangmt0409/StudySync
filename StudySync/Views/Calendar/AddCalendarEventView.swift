@@ -229,6 +229,7 @@ struct AddCalendarEventView: View {
                     .pickerStyle(.menu)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(isEditing ? L10n.calEditCalEvent : L10n.calAddCalEvent)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -241,6 +242,7 @@ struct AddCalendarEventView: View {
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
+            .dismissKeyboardToolbar()
             .alert(L10n.errorTitle, isPresented: $showError) {
                 Button(L10n.done) {}
             } message: {

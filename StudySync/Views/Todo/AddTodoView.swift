@@ -4,11 +4,17 @@ import SwiftData
 struct AddTodoView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+
+    @Query(sort: \GradeCourse.name) private var courses: [GradeCourse]
 
     @State private var title = ""
     @State private var note = ""
     @State private var emoji = "📌"
     @State private var priority: TodoPriority = .medium
+    @State private var selectedCourseName: String? = nil
+    @State private var showOtherCourseField = false
+    @State private var customCourseName = ""
     @State private var hasDueDate = false
     @State private var dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var showEmojiPicker = false
@@ -90,6 +96,9 @@ struct AddTodoView: View {
                             }
                         }
 
+                        // Course picker
+                        coursePickerSection
+
                         // Due date
                         VStack(alignment: .leading, spacing: 8) {
                             Toggle(isOn: $hasDueDate.animation(.spring(duration: 0.2))) {
@@ -116,6 +125,7 @@ struct AddTodoView: View {
                     .padding(.bottom, SSSpacing.xxl)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(L10n.todoAdd)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -130,7 +140,74 @@ struct AddTodoView: View {
                     .disabled(!canSave)
                 }
             }
+            .dismissKeyboardToolbar()
         }
+    }
+
+    // MARK: - Course Picker Section
+
+    private var coursePickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.todoCourse)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(courses.filter { !$0.isArchived }, id: \.id) { course in
+                        let isSelected = selectedCourseName == course.name && !showOtherCourseField
+                        Button {
+                            showOtherCourseField = false
+                            selectedCourseName = isSelected ? nil : course.name
+                            HapticEngine.shared.selection()
+                        } label: {
+                            Text(course.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(isSelected ? .white : SSColor.brand)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule().fill(isSelected ? SSColor.brand : SSColor.brand.opacity(0.12))
+                                )
+                        }
+                    }
+
+                    // "Other" option
+                    Button {
+                        showOtherCourseField.toggle()
+                        if !showOtherCourseField {
+                            customCourseName = ""
+                            selectedCourseName = nil
+                        } else {
+                            selectedCourseName = nil
+                        }
+                        HapticEngine.shared.selection()
+                    } label: {
+                        Text(L10n.todoCourseOther)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(showOtherCourseField ? .white : .secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(showOtherCourseField ? Color.secondary : Color.secondary.opacity(0.12))
+                            )
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
+            if showOtherCourseField {
+                TextField(L10n.todoCoursePlaceholder, text: $customCourseName)
+                    .font(.system(size: 15))
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
+                            .fill(SSColor.backgroundCard)
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.2), value: showOtherCourseField)
     }
 
     // MARK: - Emoji Section
@@ -149,7 +226,7 @@ struct AddTodoView: View {
             }
 
             if showEmojiPicker {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
+                LazyVGrid(columns: iPadGridColumns(iPhone: 8, spacing: 8, sizeClass: hSizeClass), spacing: 10) {
                     ForEach(emojis, id: \.self) { e in
                         Button {
                             emoji = e
@@ -184,7 +261,14 @@ struct AddTodoView: View {
         todo.emoji = emoji
         todo.priority = priority
         todo.dueDate = hasDueDate ? dueDate : nil
+        if showOtherCourseField {
+            let custom = customCourseName.trimmingCharacters(in: .whitespaces)
+            todo.courseName = custom.isEmpty ? nil : custom
+        } else {
+            todo.courseName = selectedCourseName
+        }
         modelContext.insert(todo)
+        TodoItemSyncService.shared.pushTodo(todo)
         HapticEngine.shared.success()
         dismiss()
     }

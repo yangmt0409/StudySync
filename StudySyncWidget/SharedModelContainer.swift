@@ -5,7 +5,7 @@ struct SharedModelContainer {
     static let appGroupID = "group.com.studysync.shared"
 
     static func create() -> ModelContainer {
-        let schema = Schema([CountdownEvent.self, UserSettings.self, DeadlineRecord.self])
+        let schema = Schema([CountdownEvent.self, UserSettings.self, DeadlineRecord.self, TravelEvent.self])
 
         let config: ModelConfiguration
 

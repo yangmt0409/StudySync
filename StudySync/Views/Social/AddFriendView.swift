@@ -16,19 +16,19 @@ struct AddFriendView: View {
     @State private var showCopiedToast = false
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: SSSpacing.xxxl) {
             // Header
-            VStack(spacing: 8) {
+            VStack(spacing: SSSpacing.md) {
                 Image(systemName: "person.badge.plus")
                     .font(.system(size: 44))
-                    .foregroundStyle(Color(hex: "#4ECDC4"))
-                    .padding(.top, 20)
+                    .foregroundStyle(SSColor.travel)
+                    .padding(.top, SSSpacing.xxl)
 
                 Text(L10n.socialAddFriend)
                     .font(.system(size: 20, weight: .bold))
 
                 Text(L10n.socialAddFriendDesc)
-                    .font(.system(size: 14))
+                    .font(SSFont.secondary)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -36,14 +36,14 @@ struct AddFriendView: View {
 
             // My friend code
             if let profile = auth.userProfile {
-                VStack(spacing: 6) {
+                VStack(spacing: SSSpacing.sm) {
                     Text(L10n.socialMyCode)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
+                    HStack(spacing: SSSpacing.md) {
                         Text(profile.friendCode)
                             .font(.system(size: 24, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Color(hex: "#5B7FFF"))
+                            .foregroundStyle(SSColor.brand)
 
                         Button {
                             UIPasteboard.general.string = profile.friendCode
@@ -55,24 +55,24 @@ struct AddFriendView: View {
                             }
                         } label: {
                             Image(systemName: "doc.on.doc.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color(hex: "#5B7FFF"))
+                                .font(SSFont.body)
+                                .foregroundStyle(SSColor.brand)
                         }
                     }
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, SSSpacing.lg)
                 .frame(maxWidth: .infinity)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(hex: "#5B7FFF").opacity(0.08))
+                    RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
+                        .fill(SSColor.brand.opacity(SSOpacity.shadow))
                 )
-                .padding(.horizontal, 24)
+                .padding(.horizontal, SSSpacing.xxxl)
             }
 
             // Enter friend's code
-            VStack(spacing: 12) {
+            VStack(spacing: SSSpacing.lg) {
                 Text(L10n.socialEnterCode)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(SSFont.chipLabel)
 
                 TextField("XXXXXX", text: $friendCode)
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
@@ -89,7 +89,7 @@ struct AddFriendView: View {
                         errorMessage = nil
                     }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
 
             // Search button
             Button {
@@ -99,19 +99,19 @@ struct AddFriendView: View {
                     ProgressView().tint(.white)
                 } else {
                     Text(L10n.socialSearch)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(SSFont.bodySemibold)
                 }
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.vertical, SSSpacing.lgXl)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                     .fill(friendCode.count == 6
-                          ? Color(hex: "#4ECDC4").gradient
+                          ? SSColor.travel.gradient
                           : Color.gray.gradient)
             )
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
             .disabled(friendCode.count != 6 || isSearching)
 
             // Result
@@ -120,46 +120,47 @@ struct AddFriendView: View {
             }
 
             if requestSent {
-                HStack(spacing: 6) {
+                HStack(spacing: SSSpacing.sm) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Text(L10n.socialRequestSent)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(SSFont.bodySmallMedium)
                         .foregroundStyle(.green)
                 }
-                .padding(.top, 8)
+                .padding(.top, SSSpacing.md)
             }
 
             if let error = errorMessage {
                 Text(error)
-                    .font(.system(size: 14))
+                    .font(SSFont.secondary)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, SSSpacing.xxxl)
             }
 
             Spacer()
         }
         .navigationTitle(L10n.socialAddFriend)
         .navigationBarTitleDisplayMode(.inline)
+        .dismissKeyboardToolbar()
         // #12 Copied toast overlay
         .overlay(alignment: .top) {
             if showCopiedToast {
-                HStack(spacing: 6) {
+                HStack(spacing: SSSpacing.sm) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Text(L10n.codeCopied)
                         .font(SSFont.caption)
                 }
                 .padding(.horizontal, SSSpacing.xl)
-                .padding(.vertical, 8)
+                .padding(.vertical, SSSpacing.md)
                 .background(
                     Capsule()
                         .fill(.ultraThinMaterial)
                         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
-                .padding(.top, 8)
+                .padding(.top, SSSpacing.md)
             }
         }
     }
@@ -168,13 +169,13 @@ struct AddFriendView: View {
 
     private func foundUserCard(_ user: UserProfile) -> some View {
         let alreadySent = sentToUserIds.contains(user.id)
-        return HStack(spacing: 14) {
+        return HStack(spacing: SSSpacing.lgXl) {
             Text(user.avatarEmoji)
                 .font(.system(size: 36))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.displayName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(SSFont.bodySemibold)
                 Text(user.friendCode)
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -194,21 +195,21 @@ struct AddFriendView: View {
                     Text(requestSent ? L10n.socialRequestSent : L10n.socialSendRequest)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, SSSpacing.xl)
+                        .padding(.vertical, SSSpacing.md)
                         .background(Capsule().fill(
-                            requestSent ? Color.gray.gradient : Color(hex: "#5B7FFF").gradient
+                            requestSent ? Color.gray.gradient : SSColor.brand.gradient
                         ))
                 }
                 .disabled(requestSent)
             }
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
-        .padding(.horizontal, 24)
+        .padding(.horizontal, SSSpacing.xxxl)
     }
 
     // MARK: - Actions

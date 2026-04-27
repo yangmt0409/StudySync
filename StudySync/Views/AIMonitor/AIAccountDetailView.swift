@@ -10,7 +10,20 @@ struct AIAccountDetailView: View {
     @State private var isRefreshing = false
     @State private var showDeleteAlert = false
     @State private var showRelogin = false
-    @State private var showDebugLog = true
+    @State private var showDebugLog = false
+    @State private var peakTimezone: String = UserDefaults.standard.string(forKey: "ai_peak_timezone") ?? "America/Toronto"
+
+    /// Common Claude server regions for peak hour detection
+    private static let peakTimezoneOptions: [(id: String, label: String)] = [
+        ("America/Toronto", "Toronto (EST)"),
+        ("America/New_York", "New York (EST)"),
+        ("America/Los_Angeles", "Los Angeles (PST)"),
+        ("America/Chicago", "Chicago (CST)"),
+        ("Europe/London", "London (GMT)"),
+        ("Europe/Paris", "Paris (CET)"),
+        ("Asia/Tokyo", "Tokyo (JST)"),
+        ("Australia/Sydney", "Sydney (AEST)"),
+    ]
 
     private var usageService: AIUsageService { AIUsageService.shared }
 
@@ -23,6 +36,9 @@ struct AIAccountDetailView: View {
                 } else {
                     usageWindowsCard
                 }
+                // Usage trend chart
+                AIUsageTrendView(account: account)
+
                 if account.extraUsageEnabled {
                     extraUsageCard
                 }
@@ -616,6 +632,26 @@ struct AIAccountDetailView: View {
                 }
             }
             .font(.subheadline)
+
+            // Peak hour timezone (Claude only)
+            if account.provider == .claude {
+                Divider()
+                HStack {
+                    Text(L10n.aiPeakTimezone)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $peakTimezone) {
+                        ForEach(Self.peakTimezoneOptions, id: \.id) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: peakTimezone) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: "ai_peak_timezone")
+                    }
+                }
+                .font(.subheadline)
+            }
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -684,6 +720,9 @@ struct AIAccountDetailView: View {
     }
 
     private func refresh() async {
+        guard !isRefreshing else { return }
+        // Debounce: prevent rapid consecutive refreshes (min 10s interval)
+        if let last = account.lastFetchedAt, Date().timeIntervalSince(last) < 10 { return }
         isRefreshing = true
         await usageService.fetchUsage(for: account)
         isRefreshing = false

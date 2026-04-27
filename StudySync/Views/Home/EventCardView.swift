@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EventCardView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     let event: CountdownEvent
     var onTogglePin: (() -> Void)?
     var onDelete: (() -> Void)?
@@ -78,14 +79,17 @@ struct EventCardView: View {
 
             Spacer(minLength: 0)
 
-            // 全幅点阵 - 固定 20 列，底部对齐
+            // 全幅点阵。iPhone 一直用 20 列（卡窄、视觉饱满）；iPad 多卡布局
+            // 下卡片本身已变窄（iPhone 自然宽），如果再 20 列会让点阵看起来仍
+            // 然密集触发密恐。改为 iPad 用 12 列 — 单元格变大、行数变多但视觉
+            // 更松弛。
             DotGridProgressView(
                 startDate: event.startDate,
                 endDate: event.endDate,
                 accentColor: Color(hex: event.dotColorHex),
                 dotShape: event.dotShape,
                 timeUnit: event.timeUnit,
-                gridColumns: 20,
+                gridColumns: hSizeClass == .regular ? 12 : 20,
                 isCompact: false,
                 showAsCountUp: event.showAsCountUp
             )

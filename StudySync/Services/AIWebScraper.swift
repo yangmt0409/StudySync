@@ -12,6 +12,7 @@ final class AIWebScraper: NSObject, WKNavigationDelegate {
     private let maxRetries = 3
     private var isFinished = false
     private var isInjecting = false
+    private var timeoutTask: Task<Void, Never>?
 
     func scrape(url: URL, javascript: String, waitSeconds: Double = 3.0) async -> String? {
         self.jsScript = javascript
@@ -41,8 +42,10 @@ final class AIWebScraper: NSObject, WKNavigationDelegate {
             self.webView = wv
             wv.load(URLRequest(url: url))
 
-            // Timeout after 25s (SPAs may need extra time)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
+            // Timeout after 25s using structured concurrency (avoids retain cycle)
+            self.timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(25))
+                guard !Task.isCancelled else { return }
                 self?.finish(result: nil)
             }
         }
@@ -107,6 +110,8 @@ final class AIWebScraper: NSObject, WKNavigationDelegate {
     private func finish(result: String?) {
         guard !isFinished else { return }
         isFinished = true
+        timeoutTask?.cancel()
+        timeoutTask = nil
         webView?.removeFromSuperview()
         webView = nil
         if let cont = continuation {

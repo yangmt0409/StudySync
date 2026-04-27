@@ -13,20 +13,20 @@ struct LoginView: View {
     private var auth: AuthService { .shared }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: SSSpacing.xxxl) {
             Spacer()
 
             // Header
-            VStack(spacing: 8) {
+            VStack(spacing: SSSpacing.md) {
                 Image(systemName: "person.2.circle.fill")
                     .font(.system(size: 56))
-                    .foregroundStyle(Color(hex: "#5B7FFF").gradient)
+                    .foregroundStyle(SSColor.brand.gradient)
 
                 Text(L10n.socialWelcome)
                     .font(.system(size: 22, weight: .bold))
 
                 Text(L10n.socialWelcomeDesc)
-                    .font(.system(size: 14))
+                    .font(SSFont.secondary)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -44,30 +44,30 @@ struct LoginView: View {
             }
             .signInWithAppleButtonStyle(.black)
             .frame(height: 50)
-            .cornerRadius(12)
-            .padding(.horizontal, 24)
+            .cornerRadius(SSRadius.fieldCard)
+            .padding(.horizontal, SSSpacing.xxxl)
 
             // Divider
             HStack {
                 Rectangle().fill(Color(.separator)).frame(height: 1)
                 Text(L10n.socialOrEmail)
-                    .font(.system(size: 13))
+                    .font(SSFont.caption)
                     .foregroundStyle(.secondary)
                 Rectangle().fill(Color(.separator)).frame(height: 1)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
 
             // Email form
-            VStack(spacing: 12) {
+            VStack(spacing: SSSpacing.lg) {
                 if !isLogin {
                     TextField(L10n.socialDisplayName, text: $displayName)
                         .textFieldStyle(.roundedBorder)
                         .textContentType(.name)
 
                     // Birthday (optional)
-                    HStack(spacing: 10) {
+                    HStack(spacing: SSSpacing.mdLg) {
                         Image(systemName: "birthday.cake")
-                            .foregroundStyle(Color(hex: "#5B7FFF"))
+                            .foregroundStyle(SSColor.brand)
                             .frame(width: 20)
                         if addBirthday {
                             DatePicker("", selection: $birthdayDate, in: ...Date(), displayedComponents: .date)
@@ -84,14 +84,14 @@ struct LoginView: View {
                                 withAnimation(.spring(duration: 0.25)) { addBirthday = true }
                             } label: {
                                 Text(L10n.birthdayAddOptional)
-                                    .font(.system(size: 14))
+                                    .font(SSFont.secondary)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, SSSpacing.md)
+                    .padding(.vertical, SSSpacing.sm)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(Color(.systemBackground))
@@ -121,12 +121,12 @@ struct LoginView: View {
                         } label: {
                             Text(L10n.authForgotPassword)
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color(hex: "#5B7FFF"))
+                                .foregroundStyle(SSColor.brand)
                         }
                     }
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
 
             // Submit button
             Button {
@@ -142,20 +142,20 @@ struct LoginView: View {
                     ProgressView()
                         .tint(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, SSSpacing.lgXl)
                 } else {
                     Text(isLogin ? L10n.socialLogin : L10n.socialRegister)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(SSFont.bodySemibold)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, SSSpacing.lgXl)
                 }
             }
             .foregroundStyle(.white)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(hex: "#5B7FFF").gradient)
+                RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
+                    .fill(SSColor.brand.gradient)
             )
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SSSpacing.xxxl)
             .disabled(email.isEmpty || password.isEmpty || (!isLogin && displayName.trimmingCharacters(in: .whitespaces).isEmpty) || auth.isLoading)
 
             // Toggle login/register
@@ -165,17 +165,17 @@ struct LoginView: View {
                 }
             } label: {
                 Text(isLogin ? L10n.socialNoAccount : L10n.socialHasAccount)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color(hex: "#5B7FFF"))
+                    .font(SSFont.secondary)
+                    .foregroundStyle(SSColor.brand)
             }
 
             // Error
             if let error = auth.errorMessage {
                 Text(error)
-                    .font(.system(size: 13))
+                    .font(SSFont.caption)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, SSSpacing.xxxl)
             }
 
             Spacer()
@@ -202,48 +202,48 @@ private struct PasswordResetView: View {
         NavigationStack {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
-                VStack(spacing: 20) {
+                VStack(spacing: SSSpacing.xxl) {
                     Spacer().frame(height: 12)
 
                     Image(systemName: "key.fill")
                         .font(.system(size: 44))
-                        .foregroundStyle(Color(hex: "#5B7FFF"))
+                        .foregroundStyle(SSColor.brand)
 
                     Text(L10n.authResetTitle)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(SSFont.heading2)
 
                     Text(L10n.authResetSubtitle)
-                        .font(.system(size: 14))
+                        .font(SSFont.secondary)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
 
                     if didSend {
-                        VStack(spacing: 8) {
+                        VStack(spacing: SSSpacing.md) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 36))
                                 .foregroundStyle(.green)
                             Text(L10n.authResetSent)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 32)
                         }
-                        .padding(.top, 8)
+                        .padding(.top, SSSpacing.md)
                     } else {
                         TextField(L10n.socialEmail, text: $email)
                             .textFieldStyle(.roundedBorder)
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, SSSpacing.xxxl)
 
                         if let errorText = errorText {
                             Text(errorText)
-                                .font(.system(size: 12))
+                                .font(SSFont.footnote)
                                 .foregroundStyle(.red)
                                 .multilineTextAlignment(.center)
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, SSSpacing.xxxl)
                         }
 
                         Button {
@@ -252,26 +252,26 @@ private struct PasswordResetView: View {
                             if auth.isLoading {
                                 ProgressView().tint(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
+                                    .padding(.vertical, SSSpacing.lgXl)
                             } else {
                                 Text(L10n.authResetSendButton)
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(SSFont.bodySemibold)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
+                                    .padding(.vertical, SSSpacing.lgXl)
                             }
                         }
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(hex: "#5B7FFF").opacity(email.isEmpty ? 0.4 : 1))
+                            RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
+                                .fill(SSColor.brand.opacity(email.isEmpty ? SSOpacity.disabled : 1))
                         )
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, SSSpacing.xxxl)
                         .disabled(email.isEmpty || auth.isLoading)
                     }
 
                     Spacer()
                 }
-                .padding(.top, 8)
+                .padding(.top, SSSpacing.md)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -282,6 +282,7 @@ private struct PasswordResetView: View {
                     }
                 }
             }
+            .dismissKeyboardToolbar()
             .onAppear {
                 if email.isEmpty { email = initialEmail }
             }

@@ -16,7 +16,14 @@ struct AddCountdownIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let container = SharedModelContainer.create()
+        // Prefer the main app's container when this intent runs in-process
+        // (Spotlight / in-app shortcuts) — opening a second container on
+        // the same store URL with a different schema corrupts metadata
+        // (root cause of v1.0 data-loss bug). See AppContainer.swift.
+        // Only fall back to a fresh container when we're genuinely in a
+        // separate process (Shortcuts app, etc.) where the main container
+        // isn't reachable.
+        let container = AppContainer.shared.container ?? SharedModelContainer.create()
         let context = ModelContext(container)
 
         guard let endDate = Calendar.current.date(byAdding: .day, value: daysFromNow, to: Date()) else {

@@ -45,6 +45,9 @@ playground.xcworkspace
 # Secrets
 *.p12
 *.cer
+# Runtime secrets — API keys etc. Each developer populates Secrets.swift
+# locally from Secrets.swift.template (which IS committed as documentation).
+StudySync/Services/Travel/Secrets.swift
 
 # Node
 node_modules/

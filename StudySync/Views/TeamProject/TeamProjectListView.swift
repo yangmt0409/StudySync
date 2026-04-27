@@ -3,6 +3,7 @@ import SwiftUI
 struct TeamProjectListView: View {
     @State private var viewModel = TeamProjectViewModel()
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @State private var hasAppeared = false
 
     var body: some View {
@@ -85,7 +86,7 @@ struct TeamProjectListView: View {
         .sheet(isPresented: $viewModel.showingCreateProject) {
             CreateProjectView(viewModel: viewModel)
         }
-        .sheet(isPresented: $viewModel.showingPaywall) {
+        .fullScreenCover(isPresented: $viewModel.showingPaywall) {
             PaywallView()
         }
         .sheet(isPresented: $viewModel.showingJoinProject) {
@@ -140,33 +141,43 @@ struct TeamProjectListView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        // Two-button empty state — SSEmptyStateView only supports one CTA,
+        // so we keep a custom layout but reuse all the design tokens for
+        // sizing/spacing parity with other empty states.
+        VStack(spacing: ipScaled(SSSpacing.xl, sizeClass: hSizeClass)) {
             Spacer().frame(height: 60)
 
             Image(systemName: "person.3.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(Color(hex: "#5B7FFF").opacity(0.4))
+                .font(.system(size: ipScaled(48, scale: 1.5, sizeClass: hSizeClass)))
+                .foregroundStyle(SSColor.brand.opacity(SSOpacity.disabled))
 
-            Text(L10n.projectEmpty)
-                .font(.system(size: 18, weight: .semibold))
+            VStack(spacing: ipScaled(SSSpacing.md, sizeClass: hSizeClass)) {
+                Text(L10n.projectEmpty)
+                    .font(.system(size: ipScaled(17, scale: 1.5, sizeClass: hSizeClass), weight: .semibold))
+                    .foregroundStyle(.secondary)
 
-            Text(L10n.projectEmptyDesc)
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                Text(L10n.projectEmptyDesc)
+                    .font(.system(size: ipScaled(14, scale: 1.4, sizeClass: hSizeClass)))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SSSpacing.xxxl)
+            }
 
-            HStack(spacing: 12) {
+            HStack(spacing: SSSpacing.lg) {
                 Button {
                     viewModel.tryCreateProject()
                     HapticEngine.shared.lightImpact()
                 } label: {
-                    Label(L10n.projectCreate, systemImage: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Capsule().fill(Color(hex: "#5B7FFF").gradient))
+                    HStack(spacing: SSSpacing.sm) {
+                        Image(systemName: "plus")
+                            .font(.system(size: ipScaled(14, scale: 1.4, sizeClass: hSizeClass), weight: .bold))
+                        Text(L10n.projectCreate)
+                            .font(.system(size: ipScaled(15, scale: 1.4, sizeClass: hSizeClass), weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, ipScaled(SSSpacing.xxl, sizeClass: hSizeClass))
+                    .padding(.vertical, ipScaled(SSSpacing.mdLg, sizeClass: hSizeClass))
+                    .background(Capsule().fill(SSColor.brand.gradient))
                 }
 
                 Button {
@@ -174,17 +185,18 @@ struct TeamProjectListView: View {
                     HapticEngine.shared.lightImpact()
                 } label: {
                     Label(L10n.projectJoin, systemImage: "person.badge.plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#5B7FFF"))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule().stroke(Color(hex: "#5B7FFF"), lineWidth: 1.5)
-                        )
+                        .font(.system(size: ipScaled(15, scale: 1.4, sizeClass: hSizeClass), weight: .semibold))
+                        .foregroundStyle(SSColor.brand)
+                        .padding(.horizontal, ipScaled(SSSpacing.xxl, sizeClass: hSizeClass))
+                        .padding(.vertical, ipScaled(SSSpacing.mdLg, sizeClass: hSizeClass))
+                        .background(Capsule().stroke(SSColor.brand, lineWidth: SSBorder.cardWidth + 0.5))
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, SSSpacing.md)
+
+            Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Invites Section

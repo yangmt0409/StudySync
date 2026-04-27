@@ -121,6 +121,12 @@ enum L10n {
     static let restorePurchase = String(localized: "恢复购买")
     static let purchaseSuccess = String(localized: "购买成功!")
     static let allProUnlocked = String(localized: "已解锁所有 Pro 功能")
+    static let proAlreadyActivated = String(localized: "Pro 已激活")
+    static let proLifetimeActive = String(localized: "🎁 终身 Pro — 感谢你的早期支持")
+    static let proSubscriptionActive = String(localized: "通过 App Store 购买激活")
+    static func proRewardValidUntil(_ date: String) -> String {
+        String(localized: "专注挑战奖励 · 有效期至 \(date)")
+    }
 
     // MARK: - Detail View
     static let confirmDelete = String(localized: "确认删除")
@@ -232,7 +238,7 @@ enum L10n {
     static let enjoyFreeTime = String(localized: "享受自由时光！")
     static let connectCalendar = String(localized: "连接你的日历")
     static let calendarAccessDescription = String(localized: "StudySync 需要访问你的日历来显示课程和事件的实时倒计时。你的数据仅在本地使用，不会上传。")
-    static let allowAccess = String(localized: "允许访问")
+    static let allowAccess = String(localized: "下一步")
     static let calendarDenied = String(localized: "日历访问被拒绝")
     static let openSettings = String(localized: "请在系统设置中允许 StudySync 访问你的日历。")
     static let goToSettings = String(localized: "去设置中开启")
@@ -332,10 +338,16 @@ enum L10n {
     static let socialFeatures = String(localized: "社交 / 好友")
     static let cloudSyncAllFree = String(localized: "云端同步")
     static let comingSoon = String(localized: "即将推出")
-    static let sandboxBannerTitle = String(localized: "TestFlight 测试版 · 放心点购买")
-    static let sandboxBannerBody = String(localized: "检测到你是通过 TestFlight 安装的，所有购买都走 Apple 沙盒环境，不会真实扣款。请放心点击下方按钮完成测试购买。")
     static let signOutConfirmTitle = String(localized: "确认登出?")
     static let signOutConfirmMessage = String(localized: "登出后本设备将停止从云端同步新的数据，社交、团队、通知功能也会暂停。已下载到本地的倒计时和学习目标会保留，重新登录即可继续同步。")
+    static let deleteAccountAction = String(localized: "永久删除账户")
+    static let deleteAccountConfirmTitle = String(localized: "永久删除账户？")
+    static let deleteAccountConfirmMessage = String(localized: "此操作不可撤销。你的账户、好友关系、分享的 Due、时间轴、组队专注、学习目标云端记录将被永久删除。本地的倒计时和学习目标仍保留在设备上。")
+    static let deleteAccountInProgress = String(localized: "正在删除账户…")
+    static let deleteAccountSuccess = String(localized: "账户已删除")
+    static let deleteAccountErrorTitle = String(localized: "删除失败")
+    static let deleteAccountErrorReauth = String(localized: "出于安全考虑，请重新登录后再删除账户")
+    static let deleteAccountErrorNotSignedIn = String(localized: "请先登录")
     static let notifActionOpen = String(localized: "查看")
     static let notifActionSnooze = String(localized: "明天再提醒")
     static let notifActionMarkSeen = String(localized: "忽略")
@@ -343,10 +355,10 @@ enum L10n {
     // MARK: - Onboarding
     static let onboardingSkip = String(localized: "跳过")
     static let onboardingNext = String(localized: "下一步")
-    static let onboardingAllowNotif = String(localized: "允许通知")
+    static let onboardingAllowNotif = String(localized: "下一步")
     static let onboardingGetStarted = String(localized: "开始使用")
     static let onboardingWelcomeTitle = String(localized: "欢迎来到 StudySync")
-    static let onboardingWelcomeSubtitle = String(localized: "为留学生打造的一站式时间管理 App — 倒计时、学习目标、双时区、AI 用量，全都在这里。")
+    static let onboardingWelcomeSubtitle = String(localized: "为学生打造的一站式时间管理 App — 倒计时、专注、待办、学习目标，全都在这里。")
     static let onboardingFeaturesTitle = String(localized: "你可以做什么")
     static let onboardingFeatureCountdown = String(localized: "倒计时事件")
     static let onboardingFeatureCountdownDesc = String(localized: "考试、签证、回国机票、截止日期——一眼看清还剩多少天。")
@@ -503,6 +515,7 @@ enum L10n {
     static let aiNoAccountsDesc = String(localized: "关联你的 AI 服务账户\n实时追踪用量和剩余额度")
     static let aiAddAccount = String(localized: "添加账户")
     static let aiAddAccountDesc = String(localized: "选择你要关联的 AI 服务，登录后自动追踪用量。")
+    static let aiMonitorDisclaimer = String(localized: "使用你自己的账户凭证获取你自己的用量数据，数据仅在本设备使用。此功能与 AI 服务提供方无官方合作，若对方调整接口可能暂时失效。")
     static let aiDeleteAccount = String(localized: "删除账户")
     static let aiDeleteConfirm = String(localized: "删除后登录凭证也会从设备中移除，此操作无法撤销。")
     static let aiLow = String(localized: "用量高")
@@ -602,6 +615,13 @@ enum L10n {
     static let aiDailyUsage = String(localized: "每日用量")
     static let aiWeeklyWindow = String(localized: "每周额度")
     static let aiWeeklyUsage = String(localized: "每周用量")
+
+    // Peak timezone
+    static let aiPeakTimezone = String(localized: "Peak Hour 时区")
+    static let aiDataStale = String(localized: "数据可能已过期")
+    // Usage trend
+    static let aiUsageTrend = String(localized: "用量趋势")
+    static let aiTrendNoData = String(localized: "数据积累中，稍后查看趋势图")
 
     // MARK: - Study Goals
     static let goalTitle = String(localized: "学习目标")
@@ -767,6 +787,12 @@ enum L10n {
     static let profileBadgesSection = String(localized: "获得的徽章")
     static let profileNoBadges = String(localized: "暂无徽章")
     static let profileNoBadgesDesc = String(localized: "完成打卡和社交成就即可获得徽章")
+    // Showcase decorations
+    static let profileShowcaseDecorations = String(localized: "展示书桌")
+    static let profileShowcaseDecorationsDesc = String(localized: "选择最多 5 个装饰品展示在个人资料上")
+    static let profileNoDecorations = String(localized: "还没有解锁装饰品")
+    static let profileNoDecorationsDesc = String(localized: "在学习空间中累积专注时长即可解锁")
+    static let profileMyDesk = String(localized: "我的书桌")
     static let profileViewDues = String(localized: "查看 Due 进度")
     static let profileViewTimeline = String(localized: "查看时间轴")
     static func profileBadgeCount(_ earned: Int, _ total: Int) -> String {
@@ -835,6 +861,25 @@ enum L10n {
     static let iCloudSyncRestartTitle = String(localized: "需要重启 App")
     static let iCloudSyncRestartMessage = String(localized: "iCloud 同步设置已更改，请手动关闭并重新打开 App 以使更改生效。")
 
+    // MARK: - Legal (Privacy Policy / Terms of Use)
+    static let privacyPolicy = String(localized: "隐私政策")
+    static let termsOfUse = String(localized: "服务条款")
+    static let legalSection = String(localized: "法律")
+
+    // MARK: - iCloud Onboarding Prompt
+    static let iCloudPromptTitle = String(localized: "开启 iCloud 同步")
+    static let iCloudPromptSubtitle = String(localized: "把待办、倒计时、专注记录等数据同步到你的所有 Apple 设备。")
+    static let iCloudPromptBenefit1Title = String(localized: "多设备无缝同步")
+    static let iCloudPromptBenefit1Desc = String(localized: "iPhone 添加的待办，iPad 上立即可见")
+    static let iCloudPromptBenefit2Title = String(localized: "防止数据丢失")
+    static let iCloudPromptBenefit2Desc = String(localized: "更换或重装设备后一键恢复")
+    static let iCloudPromptBenefit3Title = String(localized: "端到端加密")
+    static let iCloudPromptBenefit3Desc = String(localized: "数据存在你的 iCloud 私人空间，他人无法访问")
+    static let iCloudPromptEnable = String(localized: "启用 iCloud 同步")
+    static let iCloudPromptSkip = String(localized: "暂不开启")
+    static let iCloudPromptDone = String(localized: "完成")
+    static let iCloudPromptRestartNote = String(localized: "下次打开 App 后同步将自动激活。这次会话期间数据先保存在本地。")
+
     // Sync Status
     static let syncStatus = String(localized: "同步状态")
     static let syncChannel = String(localized: "同步通道")
@@ -887,7 +932,7 @@ enum L10n {
     static let qrScanTitle = String(localized: "扫描二维码")
     static let qrScanHint = String(localized: "将二维码对准取景框")
     static let qrPermissionPrompt = String(localized: "需要相机权限才能扫描二维码")
-    static let qrAllowCamera = String(localized: "允许相机")
+    static let qrAllowCamera = String(localized: "下一步")
     static let qrPermissionDenied = String(localized: "相机权限已被拒绝，请在设置中开启")
     static let qrOpenSettings = String(localized: "打开设置")
 
@@ -1054,6 +1099,11 @@ enum L10n {
     static func todoClearCompletedMessage(_ count: Int) -> String {
         String(localized: "确定要删除 \(count) 条已完成的待办吗？此操作不可撤销。")
     }
+    static let todoCourse = String(localized: "课程 (可选)")
+    static let todoCourseOther = String(localized: "其他课程")
+    static let todoCoursePlaceholder = String(localized: "输入课程名")
+    static let todoAllCourses = String(localized: "全部")
+
     static func todoMoreCompleted(_ count: Int) -> String {
         String(localized: "还有 \(count) 条已完成的待办未显示")
     }
@@ -1100,6 +1150,10 @@ enum L10n {
         String(localized: "Pro 有效期至 \(date)")
     }
     static let focusChallengeUnlocked = String(localized: "恭喜！你获得了 3 个月 Pro 奖励！")
+    static let focusShortBreak = String(localized: "短休息")
+    static let focusLongBreak = String(localized: "长休息")
+    static let focusSkipBreak = String(localized: "跳过")
+    static let focusBreakComplete = String(localized: "休息结束!")
 
     // MARK: - Nudge (拍一拍)
     static let nudge = String(localized: "拍一拍")
@@ -1243,4 +1297,103 @@ enum L10n {
     }
     static let birthdayWish = String(localized: "祝你新的一岁一切顺利！🎉")
     static let birthdayAddOptional = String(localized: "添加生日（可选）")
+
+    // MARK: - Exam Review Plan
+    static let examToggle = String(localized: "标记为考试")
+    static let examReviewReminders = String(localized: "复习提醒")
+    static let examReviewPlan = String(localized: "复习计划")
+    static let examReview7d = String(localized: "第一轮复习 (考前 7 天)")
+    static let examReview3d = String(localized: "第二轮复习 (考前 3 天)")
+    static let examReview1d = String(localized: "最终复习 (考前 1 天)")
+    static let examReviewToday = String(localized: "今天")
+
+    // MARK: - Virtual Study Room
+    static let studyRoomTitle = String(localized: "自习室")
+    static func studyRoomOnline(_ count: Int) -> String {
+        String(localized: "当前 \(count) 人在学习")
+    }
+    static let studyRoomDesc = String(localized: "和朋友一起专注，互相激励")
+    static let studyRoomEmpty = String(localized: "自习室暂时没有人\n开始专注后加入吧!")
+    static let studyRoomMe = String(localized: "我")
+    static let studyRoomJoin = String(localized: "加入自习室")
+    static let studyRoomJoinDesc = String(localized: "开始专注时让朋友看到你")
+
+    // MARK: - Study Analytics
+    static let analyticsTitle = String(localized: "学习统计")
+    static let analyticsThisWeek = String(localized: "本周")
+    static let analyticsLastWeek = String(localized: "上周")
+    static let analyticsChange = String(localized: "较上周")
+    static let analyticsSessions = String(localized: "专注次数")
+    static let analyticsDailyFocus = String(localized: "每日专注")
+    static let analyticsHourly = String(localized: "学习时段分布")
+    static let analyticsGoalStreaks = String(localized: "目标连续打卡")
+    static let analyticsWeeklyReport = String(localized: "本周报告")
+    static let analyticsShareReport = String(localized: "分享周报")
+    static let analyticsTotalFocus = String(localized: "总专注")
+    static let analyticsNoData = String(localized: "本周暂无专注记录")
+    static let analyticsReportFrom = String(localized: "— 来自 StudySync")
+
+    static func analyticsReportStudyTimeHM(_ hours: Int, _ minutes: Int) -> String {
+        String(localized: "本周学习 \(hours) 小时 \(minutes) 分钟")
+    }
+    static func analyticsReportStudyTimeM(_ minutes: Int) -> String {
+        String(localized: "本周学习 \(minutes) 分钟")
+    }
+    static func analyticsReportSessions(_ count: Int) -> String {
+        String(localized: "完成 \(count) 次专注")
+    }
+    static func analyticsReportStreak(_ days: Int) -> String {
+        String(localized: "最长连续打卡 \(days) 天")
+    }
+    static func analyticsReportWeekChange(isUp: Bool, percent: String) -> String {
+        isUp
+            ? String(localized: "提升 \(percent)% 较上周")
+            : String(localized: "减少 \(percent)% 较上周")
+    }
+
+    // MARK: - Group Focus
+    static let groupFocusTitle = String(localized: "组队专注")
+    static let groupFocusBonus = String(localized: "组队专注 Bonus")
+    static let groupFocusBonusDesc = String(localized: "和朋友一起专注，完成后获得 1.5 倍时长奖励")
+    static let groupFocusBonusShort = String(localized: "完成可获 1.5x 专注时长")
+    static let groupFocusBonusReminder = String(localized: "完成组队专注可获得 1.5 倍专注时长，计入月度挑战")
+    static let groupFocusBonusActive = String(localized: "1.5x BONUS 生效中")
+    static let groupFocusCreate = String(localized: "创建房间")
+    static let groupFocusJoin = String(localized: "加入")
+    static let groupFocusStart = String(localized: "创建")
+    static let groupFocusStartAll = String(localized: "全员开始专注")
+    static let groupFocusWaiting = String(localized: "等待成员加入...")
+    static let groupFocusWaitingHost = String(localized: "等待房主开始...")
+    static let groupFocusHost = String(localized: "房主")
+    static let groupFocusNoRooms = String(localized: "暂无活跃房间")
+    static let groupFocusActiveRooms = String(localized: "活跃房间")
+    static let groupFocusNeedMore = String(localized: "至少需要 2 人才能开始")
+    static let groupFocusGaveUp = String(localized: "已放弃")
+    static let groupFocusCompleted = String(localized: "组队专注完成!")
+    static func groupFocusCompletedDesc(_ completed: Int, _ total: Int) -> String {
+        String(localized: "\(completed)/\(total) 人完成，太棒了!")
+    }
+
+    // MARK: - Virtual Study Space
+    static let studySpaceTitle = String(localized: "我的书桌")
+    static let studySpaceSubtitle = String(localized: "专注解锁桌面装饰")
+    static let studySpaceEmpty = String(localized: "开始专注来解锁你的第一件装饰品吧!")
+    static let studySpaceHours = String(localized: "累计小时")
+    static let studySpaceUnlocked = String(localized: "已解锁")
+    static let studySpaceNextAt = String(localized: "下一个")
+    static let studySpaceCatalog = String(localized: "装饰品图鉴")
+    static let studySpaceNewItem = String(localized: "解锁新装饰!")
+    static func studySpaceUnlockedAt(_ hours: Int) -> String {
+        String(localized: "累计专注 \(hours) 小时解锁")
+    }
+
+    // MARK: - Data Export
+    static let dataExport = String(localized: "数据导出")
+    static let dataExportFooter = String(localized: "导出学习数据为 CSV 文件，可用于自我评估或分享")
+    static let dataExportDesc = String(localized: "选择要导出的数据类型")
+    static let exportFocusSessions = String(localized: "专注记录")
+    static let exportCheckIns = String(localized: "打卡记录")
+    static let exportGrades = String(localized: "成绩数据")
+    static let exportCSV = String(localized: "导出 CSV")
+    static let exportNoData = String(localized: "暂无数据")
 }

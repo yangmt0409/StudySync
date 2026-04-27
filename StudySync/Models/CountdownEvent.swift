@@ -12,6 +12,8 @@ final class CountdownEvent {
     var colorHex: String = "#5B7FFF"
     var isPinned: Bool = false
     var notifyEnabled: Bool = false
+    var isExam: Bool = false
+    var reviewRemindersEnabled: Bool = false
     var createdAt: Date = Date()
 
     // New: theme & display

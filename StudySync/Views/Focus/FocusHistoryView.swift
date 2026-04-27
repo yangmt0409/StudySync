@@ -3,6 +3,7 @@ import SwiftData
 
 struct FocusHistoryView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @Query(filter: #Predicate<FocusSession> { $0.isCompleted == true },
            sort: \FocusSession.startedAt, order: .reverse)
@@ -23,14 +24,11 @@ struct FocusHistoryView: View {
                     .ignoresSafeArea()
 
                 if sessions.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.tertiary)
-                        Text(L10n.focusNoHistory)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    SSEmptyStateView(
+                        systemImage: "clock",
+                        title: L10n.focusNoHistory
+                    )
+                    .frame(maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {

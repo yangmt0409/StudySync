@@ -23,9 +23,15 @@ struct PaywallView: View {
 
                     // 恢复购买
                     restoreSection
+
+                    // Apple Guideline 3.1.2: paywall must contain functional
+                    // links to Privacy Policy and Terms of Use. Missing these
+                    // is an automatic rejection for any IAP-bearing app.
+                    legalLinksSection
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
+                .readableContentWidth()
             }
             .background {
                 Color(.systemGroupedBackground)
@@ -162,67 +168,79 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - Sandbox Environment
-
-    /// True when running under TestFlight or a Xcode-signed sandbox build.
-    /// Used to reassure pre-launch beta testers that any purchase they make
-    /// is free (sandbox environment).
-    private static var isSandboxEnvironment: Bool {
-        guard let url = Bundle.main.appStoreReceiptURL else { return false }
-        return url.lastPathComponent == "sandboxReceipt"
-    }
-
-    @ViewBuilder
-    private var sandboxBanner: some View {
-        if Self.isSandboxEnvironment {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "testtube.2")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.blue)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.sandboxBannerTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text(L10n.sandboxBannerBody)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.blue.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.blue.opacity(0.25), lineWidth: 1)
-            )
-        }
-    }
-
     // MARK: - Purchase Section
 
     private var purchaseSection: some View {
         VStack(spacing: 12) {
-            sandboxBanner
+            // If user already has Pro (lifetime / subscription / reward), celebrate instead of selling.
+            if store.isPro {
+                lifetimeProStatusCard
+            } else {
+                purchaseButton
+            }
 
-            Button {
-                Task {
-                    isPurchasing = true
-                    let success = await store.purchase()
-                    isPurchasing = false
-                    if success {
-                        showSuccess = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            dismiss()
-                        }
+            if let error = store.errorMessage {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var lifetimeProStatusCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(Color.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.proAlreadyActivated)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(proStatusDetail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.orange.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.orange.opacity(0.30), lineWidth: 1)
+        )
+    }
+
+    private var proStatusDetail: String {
+        if store.hasLifetimeGrant {
+            return L10n.proLifetimeActive
+        }
+        if store.isPurchasedPro {
+            return L10n.proSubscriptionActive
+        }
+        if let expiry = store.proRewardExpiresAt {
+            let formatted = expiry.formatted(date: .abbreviated, time: .omitted)
+            return L10n.proRewardValidUntil(formatted)
+        }
+        return ""
+    }
+
+    private var purchaseButton: some View {
+        Button {
+            Task {
+                isPurchasing = true
+                let success = await store.purchase()
+                isPurchasing = false
+                if success {
+                    showSuccess = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
                     }
                 }
-            } label: {
+            }
+        } label: {
                 HStack(spacing: 8) {
                     if isPurchasing {
                         ProgressView()
@@ -253,15 +271,8 @@ struct PaywallView: View {
                             )
                         )
                 )
-            }
-            .disabled(isPurchasing || store.isLoading)
-
-            if let error = store.errorMessage {
-                Text(error)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.red)
-            }
         }
+        .disabled(isPurchasing || store.isLoading)
     }
 
     // MARK: - Restore
@@ -275,6 +286,29 @@ struct PaywallView: View {
                 .foregroundStyle(.blue)
         }
         .disabled(store.isLoading)
+    }
+
+    // MARK: - Legal Links (Guideline 3.1.2)
+
+    /// Privacy Policy + Terms of Use links. The Apple reviewer specifically
+    /// looks for these on the paywall — missing them = auto-reject. Both
+    /// URLs are hosted on the project's GitHub Pages site (`AppLegalURL`).
+    private var legalLinksSection: some View {
+        HStack(spacing: 16) {
+            Link(destination: AppLegalURL.privacyPolicy) {
+                Text(L10n.privacyPolicy)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text("·")
+                .foregroundStyle(.tertiary)
+            Link(destination: AppLegalURL.termsOfUse) {
+                Text(L10n.termsOfUse)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.top, 8)
     }
 
     // MARK: - Success Overlay

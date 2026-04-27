@@ -7,6 +7,16 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable {
     case openai
     case google
 
+    /// Providers available in the current App Store storefront.
+    /// Per Apple review: AI Monitor is fully hidden on the China (CN) storefront,
+    /// so this filter is mainly a defense-in-depth safety check.
+    static var availableCases: [AIProvider] {
+        if StorefrontService.isChina {
+            return allCases.filter { $0 != .openai }
+        }
+        return allCases
+    }
+
     var displayName: String {
         switch self {
         case .claude: return "Claude"

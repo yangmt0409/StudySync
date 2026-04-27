@@ -11,6 +11,7 @@ struct UserProfile: Codable, Identifiable {
     var allowNudges: Bool
     var badges: [String]
     var showcaseBadges: [String]  // up to 3 badges to display on profile
+    var showcaseDecorations: [String]  // up to 5 desk items to display on profile
     var roles: [String]           // identity roles: developer, pro, tester, early_bird, contributor
     var createdAt: Date
 
@@ -19,8 +20,15 @@ struct UserProfile: Codable, Identifiable {
     var longestStreak: Int
     var totalFocusMinutes: Int
 
-    // Focus challenge → Pro reward
+    // Focus challenge → Pro reward (time-limited)
     var proRewardExpiresAt: Date?
+
+    // Lifetime Pro entitlement (early bird grant, or future one-time IAP).
+    // When true, `isPro` is always true regardless of subscription / reward.
+    var proLifetime: Bool
+
+    // Timestamp of early bird grant — used to audit when lifetime was granted.
+    var earlyBirdGrantedAt: Date?
 
     // Birthday (optional — for birthday celebration)
     var birthday: Date?
@@ -40,12 +48,15 @@ struct UserProfile: Codable, Identifiable {
         allowNudges: Bool = true,
         badges: [String] = [],
         showcaseBadges: [String] = [],
+        showcaseDecorations: [String] = [],
         roles: [String] = [],
         createdAt: Date = Date(),
         totalCheckIns: Int = 0,
         longestStreak: Int = 0,
         totalFocusMinutes: Int = 0,
-        birthday: Date? = nil
+        birthday: Date? = nil,
+        proLifetime: Bool = false,
+        earlyBirdGrantedAt: Date? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -57,12 +68,15 @@ struct UserProfile: Codable, Identifiable {
         self.allowNudges = allowNudges
         self.badges = badges
         self.showcaseBadges = showcaseBadges
+        self.showcaseDecorations = showcaseDecorations
         self.roles = roles
         self.createdAt = createdAt
         self.totalCheckIns = totalCheckIns
         self.longestStreak = longestStreak
         self.totalFocusMinutes = totalFocusMinutes
         self.birthday = birthday
+        self.proLifetime = proLifetime
+        self.earlyBirdGrantedAt = earlyBirdGrantedAt
     }
 
     static func generateFriendCode() -> String {
@@ -83,6 +97,7 @@ struct UserProfile: Codable, Identifiable {
         allowNudges = try container.decodeIfPresent(Bool.self, forKey: .allowNudges) ?? true
         badges = try container.decode([String].self, forKey: .badges)
         showcaseBadges = try container.decodeIfPresent([String].self, forKey: .showcaseBadges) ?? []
+        showcaseDecorations = try container.decodeIfPresent([String].self, forKey: .showcaseDecorations) ?? []
         roles = try container.decodeIfPresent([String].self, forKey: .roles) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         totalCheckIns = try container.decodeIfPresent(Int.self, forKey: .totalCheckIns) ?? 0
@@ -90,8 +105,21 @@ struct UserProfile: Codable, Identifiable {
         totalFocusMinutes = try container.decodeIfPresent(Int.self, forKey: .totalFocusMinutes) ?? 0
         birthday = try container.decodeIfPresent(Date.self, forKey: .birthday)
         proRewardExpiresAt = try container.decodeIfPresent(Date.self, forKey: .proRewardExpiresAt)
+        proLifetime = try container.decodeIfPresent(Bool.self, forKey: .proLifetime) ?? false
+        earlyBirdGrantedAt = try container.decodeIfPresent(Date.self, forKey: .earlyBirdGrantedAt)
         fcmToken = try container.decodeIfPresent(String.self, forKey: .fcmToken)
         fcmTokenUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .fcmTokenUpdatedAt)
+    }
+
+    // MARK: - Derived Pro Status
+
+    /// True if user has Pro via any source. THIS is the single source of truth server-side.
+    /// `roles.contains("pro")` should always track this.
+    func isProActive(storeKitPurchased: Bool = false, now: Date = Date()) -> Bool {
+        if proLifetime { return true }
+        if storeKitPurchased { return true }
+        if let expiry = proRewardExpiresAt, expiry > now { return true }
+        return false
     }
 }
 
@@ -115,13 +143,14 @@ struct FriendInfo: Codable, Identifiable {
     var allowNudges: Bool
     var allowRingNudge: Bool   // per-friend: allow this person to ring-nudge me
     var showcaseBadges: [String]
+    var showcaseDecorations: [String]
     var roles: [String]
     var addedAt: Date
     var totalCheckIns: Int
     var longestStreak: Int
     var totalFocusMinutes: Int
 
-    init(id: String, displayName: String, avatarEmoji: String, shareEnabled: Bool, allowNudges: Bool = true, allowRingNudge: Bool = false, showcaseBadges: [String] = [], roles: [String] = [], addedAt: Date = Date(), totalCheckIns: Int = 0, longestStreak: Int = 0, totalFocusMinutes: Int = 0) {
+    init(id: String, displayName: String, avatarEmoji: String, shareEnabled: Bool, allowNudges: Bool = true, allowRingNudge: Bool = false, showcaseBadges: [String] = [], showcaseDecorations: [String] = [], roles: [String] = [], addedAt: Date = Date(), totalCheckIns: Int = 0, longestStreak: Int = 0, totalFocusMinutes: Int = 0) {
         self.id = id
         self.displayName = displayName
         self.avatarEmoji = avatarEmoji
@@ -129,6 +158,7 @@ struct FriendInfo: Codable, Identifiable {
         self.allowNudges = allowNudges
         self.allowRingNudge = allowRingNudge
         self.showcaseBadges = showcaseBadges
+        self.showcaseDecorations = showcaseDecorations
         self.roles = roles
         self.addedAt = addedAt
         self.totalCheckIns = totalCheckIns
@@ -145,6 +175,7 @@ struct FriendInfo: Codable, Identifiable {
         allowNudges = try container.decodeIfPresent(Bool.self, forKey: .allowNudges) ?? true
         allowRingNudge = try container.decodeIfPresent(Bool.self, forKey: .allowRingNudge) ?? false
         showcaseBadges = try container.decodeIfPresent([String].self, forKey: .showcaseBadges) ?? []
+        showcaseDecorations = try container.decodeIfPresent([String].self, forKey: .showcaseDecorations) ?? []
         roles = try container.decodeIfPresent([String].self, forKey: .roles) ?? []
         addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
         totalCheckIns = try container.decodeIfPresent(Int.self, forKey: .totalCheckIns) ?? 0

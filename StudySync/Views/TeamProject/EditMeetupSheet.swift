@@ -242,6 +242,7 @@ struct EditMeetupSheet: View {
                 .padding(.top, SSSpacing.xl)
                 .padding(.bottom, SSSpacing.xxl)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background {
                 SSColor.backgroundPrimary.ignoresSafeArea()
             }
@@ -252,6 +253,7 @@ struct EditMeetupSheet: View {
                     Button(L10n.cancel) { dismiss() }
                 }
             }
+            .dismissKeyboardToolbar()
         }
     }
 

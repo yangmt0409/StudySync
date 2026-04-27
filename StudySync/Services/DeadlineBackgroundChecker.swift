@@ -78,8 +78,16 @@ final class DeadlineBackgroundChecker {
             task.setTaskCompleted(success: false)
         }
 
-        // Create a temporary ModelContext for background work
-        let container = SharedModelContainer.create()
+        // CRITICAL: use the main app's container, not a fresh one.
+        // Calling SharedModelContainer.create() here would open the same
+        // store URL with a different schema in the same process — this
+        // corrupts the store metadata (root cause of the v1.0 data-loss
+        // bug). See AppContainer.swift for the full writeup.
+        guard let container = AppContainer.shared.container else {
+            debugPrint("[BackgroundChecker] AppContainer not initialized — skipping refresh")
+            task.setTaskCompleted(success: false)
+            return
+        }
         let context = ModelContext(container)
 
         let manager = CalendarManager.shared
@@ -99,14 +107,18 @@ final class DeadlineBackgroundChecker {
         let completedIds = Set(records.filter(\.isCompleted).map(\.eventIdentifier))
         let deadlineEvents = manager.events.filter { deadlineIds.contains($0.eventIdentifier) }
 
-        // Check and start Live Activity if needed
-        DispatchQueue.main.async {
+        // Run Urgency update + Travel status refresh in sequence on main actor,
+        // then complete the task. The BGAppRefreshTask has ~30s typically;
+        // TravelStatusRefresher caps itself to events within 24h of departure
+        // and rate-limits per-event, so this stays under budget.
+        Task { @MainActor in
             UrgencyEngine.shared.update(
                 deadlineEvents: deadlineEvents,
                 completedIds: completedIds
             )
+            let travelContext = ModelContext(container)
+            await TravelStatusRefresher.shared.refreshUpcoming(using: travelContext)
+            task.setTaskCompleted(success: true)
         }
-
-        task.setTaskCompleted(success: true)
     }
 }

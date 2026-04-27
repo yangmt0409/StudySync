@@ -24,6 +24,7 @@ struct EventTemplate: Identifiable {
 struct AddEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     var editingEvent: CountdownEvent?
 
@@ -35,6 +36,8 @@ struct AddEventView: View {
     @State private var selectedColorHex: String = "#5B7FFF"
     @State private var isPinned: Bool = false
     @State private var notifyEnabled: Bool = true
+    @State private var isExam: Bool = false
+    @State private var reviewRemindersEnabled: Bool = false
 
     private let colorOptions: [String] = [
         "#5B7FFF", "#FF6B6B", "#4ECDC4", "#FFB347",
@@ -94,6 +97,8 @@ struct AddEventView: View {
                     selectedColorHex = event.colorHex
                     isPinned = event.isPinned
                     notifyEnabled = event.notifyEnabled
+                    isExam = event.isExam
+                    reviewRemindersEnabled = event.reviewRemindersEnabled
                 }
             }
         }
@@ -127,7 +132,7 @@ struct AddEventView: View {
 
     private var emojiSection: some View {
         Section(L10n.iconSection) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 10) {
+            LazyVGrid(columns: iPadGridColumns(iPhone: 8, spacing: 8, sizeClass: hSizeClass), spacing: 10) {
                 ForEach(emojiOptions, id: \.self) { option in
                     Text(option)
                         .font(.system(size: 26))
@@ -212,7 +217,7 @@ struct AddEventView: View {
 
     private var colorSection: some View {
         Section(L10n.cardColor) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 5), spacing: 12) {
+            LazyVGrid(columns: iPadGridColumns(iPhone: 5, spacing: 12, sizeClass: hSizeClass), spacing: 12) {
                 ForEach(colorOptions, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
@@ -243,6 +248,14 @@ struct AddEventView: View {
         Section {
             Toggle(L10n.pinDisplay, isOn: $isPinned)
             Toggle(L10n.expiryReminder, isOn: $notifyEnabled)
+            Toggle(isOn: $isExam) {
+                Label(L10n.examToggle, systemImage: "pencil.and.list.clipboard")
+            }
+            if isExam {
+                Toggle(isOn: $reviewRemindersEnabled) {
+                    Label(L10n.examReviewReminders, systemImage: "bell.badge")
+                }
+            }
         } header: {
             Text(L10n.options)
         } footer: {
@@ -321,10 +334,16 @@ struct AddEventView: View {
             event.colorHex = selectedColorHex
             event.isPinned = isPinned
             event.notifyEnabled = notifyEnabled
+            event.isExam = isExam
+            event.reviewRemindersEnabled = reviewRemindersEnabled
 
             NotificationManager.shared.removeNotifications(for: event.id)
             if notifyEnabled {
                 NotificationManager.shared.scheduleNotifications(for: event)
+            }
+            ReviewReminderService.cancelReminders(for: event.id)
+            if isExam && reviewRemindersEnabled {
+                ReviewReminderService.scheduleReminders(for: event)
             }
             CountdownEventSyncService.shared.pushEvent(event)
         } else {
@@ -338,6 +357,8 @@ struct AddEventView: View {
                 isPinned: isPinned,
                 notifyEnabled: notifyEnabled
             )
+            newEvent.isExam = isExam
+            newEvent.reviewRemindersEnabled = reviewRemindersEnabled
             modelContext.insert(newEvent)
             CountdownEventSyncService.shared.pushEvent(newEvent)
 
@@ -346,6 +367,14 @@ struct AddEventView: View {
                     let granted = await NotificationManager.shared.requestPermission()
                     if granted {
                         NotificationManager.shared.scheduleNotifications(for: newEvent)
+                    }
+                }
+            }
+            if isExam && reviewRemindersEnabled {
+                Task {
+                    let granted = await NotificationManager.shared.requestPermission()
+                    if granted {
+                        ReviewReminderService.scheduleReminders(for: newEvent)
                     }
                 }
             }

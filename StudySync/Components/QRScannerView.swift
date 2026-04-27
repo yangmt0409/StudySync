@@ -52,37 +52,43 @@ struct QRScannerView: View {
     // MARK: - Content States
 
     private var scannerContent: some View {
-        ZStack {
-            QRScannerRepresentable { code in
-                guard scannedCode == nil else { return }
-                scannedCode = code
-                HapticEngine.shared.success()
-                onCode(code)
-            }
-            .ignoresSafeArea()
-
-            // Viewfinder overlay
-            VStack {
-                Spacer()
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.9), lineWidth: 3)
-                        .frame(width: 260, height: 260)
-                    // Corner accents
-                    ForEach(0..<4) { i in
-                        cornerAccent
-                            .rotationEffect(.degrees(Double(i) * 90))
-                            .offset(
-                                x: (i == 0 || i == 3) ? -130 : 130,
-                                y: (i < 2) ? -130 : 130
-                            )
-                    }
+        GeometryReader { geo in
+            // Adaptive viewfinder size: 60% of the smaller dimension, capped at 420pt for iPad.
+            let viewfinderSize = min(min(geo.size.width, geo.size.height) * 0.6, 420)
+            let cornerOffset = viewfinderSize / 2
+            ZStack {
+                QRScannerRepresentable { code in
+                    guard scannedCode == nil else { return }
+                    scannedCode = code
+                    HapticEngine.shared.success()
+                    onCode(code)
                 }
-                Spacer()
-                Text(L10n.qrScanHint)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.bottom, 60)
+                .ignoresSafeArea()
+
+                // Viewfinder overlay
+                VStack {
+                    Spacer()
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(Color.white.opacity(0.9), lineWidth: 3)
+                            .frame(width: viewfinderSize, height: viewfinderSize)
+                        // Corner accents
+                        ForEach(0..<4) { i in
+                            cornerAccent
+                                .rotationEffect(.degrees(Double(i) * 90))
+                                .offset(
+                                    x: (i == 0 || i == 3) ? -cornerOffset : cornerOffset,
+                                    y: (i < 2) ? -cornerOffset : cornerOffset
+                                )
+                        }
+                    }
+                    Spacer()
+                    Text(L10n.qrScanHint)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(.bottom, 60)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }

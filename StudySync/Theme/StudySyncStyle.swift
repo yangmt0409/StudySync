@@ -147,6 +147,8 @@ enum SSSpacing {
 enum SSRadius {
     /// 10pt — small elements (app icon thumbnails)
     static let small: CGFloat = 10
+    /// 12pt — smaller card variant for inline event cards
+    static let fieldCard: CGFloat = 12
     /// 14pt — list rows, info sections
     static let medium: CGFloat = 14
     /// 16pt — standard cards (EventCard, form sections)

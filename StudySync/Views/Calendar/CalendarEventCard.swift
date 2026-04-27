@@ -60,17 +60,18 @@ struct CalendarEventCard: View {
     // MARK: - Card Content
 
     private var cardContent: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             // Left: color indicator
             leftIndicator
 
             // Middle: title + time
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                HStack(spacing: SSSpacing.xs) {
                     Text(event.title ?? L10n.noTitle)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(SSFont.bodySmallSemibold)
                         .foregroundStyle(status == .finished ? .secondary : .primary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
 
                     if !isEditable {
                         Image(systemName: "lock.fill")
@@ -81,11 +82,11 @@ struct CalendarEventCard: View {
 
                 if event.isAllDay {
                     Text(L10n.allDay)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Text(timeRangeText)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -94,7 +95,7 @@ struct CalendarEventCard: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(calendarColor.opacity(0.15))
+                                .fill(calendarColor.opacity(SSOpacity.lightTint))
                                 .frame(height: 4)
 
                             RoundedRectangle(cornerRadius: 2)
@@ -114,9 +115,9 @@ struct CalendarEventCard: View {
                 countdownView
             }
         }
-        .padding(14)
+        .padding(SSSpacing.lgXl)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                 .fill(status == .inProgress
                       ? calendarColor.opacity(0.06)
                       : Color(.secondarySystemGroupedBackground))
@@ -126,17 +127,37 @@ struct CalendarEventCard: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.green)
                     .frame(width: 3)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, SSSpacing.md)
             }
         }
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                 .stroke(
                     status == .inProgress ? calendarColor.opacity(0.2) : Color.clear,
                     lineWidth: 1
                 )
         )
         .opacity(status == .finished ? 0.6 : 1.0)
+        // Long-press affordance for edit / delete — matches the gesture
+        // available on EventCardView (Countdown) and DeadlineEventCard.
+        // Only shows up if the parent passes onEdit/onDelete handlers.
+        .contextMenu {
+            if let onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Label(L10n.editEvent, systemImage: "pencil")
+                }
+            }
+            if onEdit != nil && onDelete != nil { Divider() }
+            if let onDelete {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label(L10n.deleteEvent, systemImage: "trash")
+                }
+            }
+        }
     }
 
     // MARK: - Left Indicator

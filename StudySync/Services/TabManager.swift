@@ -18,6 +18,21 @@ enum AppTab: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    /// Whether this tab is available in the current App Store storefront.
+    /// AI Monitor is hidden on the China (CN) storefront per Apple review requirements
+    /// (Guideline 5 — Generative AI services require Chinese government permits).
+    var isAvailableInCurrentStorefront: Bool {
+        if self == .aiMonitor && StorefrontService.isChina {
+            return false
+        }
+        return true
+    }
+
+    /// All tabs available in the current storefront.
+    static var availableCases: [AppTab] {
+        allCases.filter { $0.isAvailableInCurrentStorefront }
+    }
+
     var displayName: String {
         switch self {
         case .schedule:  return L10n.tabSchedule
@@ -64,8 +79,8 @@ final class TabManager {
     /// iOS tab bar shows at most 5 icons — 1 reserved for our "More" tab → max 4.
     static let maxMainTabs = 4
 
-    /// Default tab order
-    static let defaultOrder: [AppTab] = AppTab.allCases
+    /// Default tab order — excludes tabs unavailable in this storefront (e.g., AI Monitor in CN)
+    static var defaultOrder: [AppTab] { AppTab.availableCases }
 
     private init() {}
 
@@ -82,11 +97,13 @@ final class TabManager {
                   let saved = try? JSONDecoder().decode([AppTab].self, from: data) else {
                 return Self.defaultOrder
             }
-            // Ensure all tabs are present (in case new tabs were added in an update)
+            // Ensure all available tabs are present (in case new tabs were added in an update)
             var result = saved
-            for tab in AppTab.allCases where !result.contains(tab) {
+            for tab in AppTab.availableCases where !result.contains(tab) {
                 result.append(tab)
             }
+            // Filter out any tabs not available in this storefront (e.g., AI Monitor in CN)
+            result.removeAll { !$0.isAvailableInCurrentStorefront }
             // Lock pinned tail tabs at the end in order
             result.removeAll { Self.pinnedTailTabs.contains($0) }
             result.append(contentsOf: Self.pinnedTailTabs)

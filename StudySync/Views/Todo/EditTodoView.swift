@@ -4,6 +4,9 @@ import SwiftData
 struct EditTodoView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+
+    @Query(sort: \GradeCourse.name) private var courses: [GradeCourse]
 
     @Bindable var todo: TodoItem
 
@@ -11,6 +14,9 @@ struct EditTodoView: View {
     @State private var note: String
     @State private var emoji: String
     @State private var priority: TodoPriority
+    @State private var selectedCourseName: String?
+    @State private var showOtherCourseField: Bool
+    @State private var customCourseName: String
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var showEmojiPicker = false
@@ -30,6 +36,12 @@ struct EditTodoView: View {
         _priority = State(initialValue: todo.priority)
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())
+
+        // Determine if the existing courseName matches a known course or is freeform
+        // We'll resolve against courses at runtime in onAppear; initialise conservatively.
+        _selectedCourseName = State(initialValue: nil)
+        _showOtherCourseField = State(initialValue: false)
+        _customCourseName = State(initialValue: "")
     }
 
     var body: some View {
@@ -103,6 +115,9 @@ struct EditTodoView: View {
                             }
                         }
 
+                        // Course picker
+                        coursePickerSection
+
                         // Due date
                         VStack(alignment: .leading, spacing: 8) {
                             Toggle(isOn: $hasDueDate.animation(.spring(duration: 0.2))) {
@@ -148,6 +163,7 @@ struct EditTodoView: View {
                     .padding(.bottom, SSSpacing.xxl)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(L10n.todoEdit)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -162,6 +178,8 @@ struct EditTodoView: View {
                     .disabled(!canSave)
                 }
             }
+            .dismissKeyboardToolbar()
+            .onAppear { resolveCourseState() }
             .alert(L10n.todoDeleteConfirm, isPresented: $showDeleteConfirm) {
                 Button(L10n.delete, role: .destructive) {
                     deleteTodo()
@@ -169,6 +187,72 @@ struct EditTodoView: View {
                 Button(L10n.cancel, role: .cancel) {}
             }
         }
+    }
+
+    // MARK: - Course Picker Section
+
+    private var coursePickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.todoCourse)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(courses.filter { !$0.isArchived }, id: \.id) { course in
+                        let isSelected = selectedCourseName == course.name && !showOtherCourseField
+                        Button {
+                            showOtherCourseField = false
+                            selectedCourseName = isSelected ? nil : course.name
+                            HapticEngine.shared.selection()
+                        } label: {
+                            Text(course.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(isSelected ? .white : SSColor.brand)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule().fill(isSelected ? SSColor.brand : SSColor.brand.opacity(0.12))
+                                )
+                        }
+                    }
+
+                    // "Other" option
+                    Button {
+                        showOtherCourseField.toggle()
+                        if !showOtherCourseField {
+                            customCourseName = ""
+                            selectedCourseName = nil
+                        } else {
+                            selectedCourseName = nil
+                        }
+                        HapticEngine.shared.selection()
+                    } label: {
+                        Text(L10n.todoCourseOther)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(showOtherCourseField ? .white : .secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(showOtherCourseField ? Color.secondary : Color.secondary.opacity(0.12))
+                            )
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
+            if showOtherCourseField {
+                TextField(L10n.todoCoursePlaceholder, text: $customCourseName)
+                    .font(.system(size: 15))
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
+                            .fill(SSColor.backgroundCard)
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.2), value: showOtherCourseField)
     }
 
     // MARK: - Emoji Section
@@ -187,7 +271,7 @@ struct EditTodoView: View {
             }
 
             if showEmojiPicker {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
+                LazyVGrid(columns: iPadGridColumns(iPhone: 8, spacing: 8, sizeClass: hSizeClass), spacing: 10) {
                     ForEach(emojis, id: \.self) { e in
                         Button {
                             emoji = e
@@ -215,18 +299,39 @@ struct EditTodoView: View {
 
     // MARK: - Save
 
+    private func resolveCourseState() {
+        guard let existing = todo.courseName, !existing.isEmpty else { return }
+        let courseNames = courses.filter { !$0.isArchived }.map(\.name)
+        if courseNames.contains(existing) {
+            selectedCourseName = existing
+            showOtherCourseField = false
+        } else {
+            showOtherCourseField = true
+            customCourseName = existing
+        }
+    }
+
     private func applyChanges() {
         todo.title = title.trimmingCharacters(in: .whitespaces)
         todo.note = note.trimmingCharacters(in: .whitespaces)
         todo.emoji = emoji
         todo.priority = priority
         todo.dueDate = hasDueDate ? dueDate : nil
+        if showOtherCourseField {
+            let custom = customCourseName.trimmingCharacters(in: .whitespaces)
+            todo.courseName = custom.isEmpty ? nil : custom
+        } else {
+            todo.courseName = selectedCourseName
+        }
+        TodoItemSyncService.shared.pushTodo(todo)
         HapticEngine.shared.success()
         dismiss()
     }
 
     private func deleteTodo() {
+        let todoId = todo.id
         modelContext.delete(todo)
+        TodoItemSyncService.shared.deleteTodo(id: todoId)
         HapticEngine.shared.warning()
         dismiss()
     }

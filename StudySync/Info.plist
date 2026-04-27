@@ -4,8 +4,27 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>api.aviationstack.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>StudySync 需要访问你的日历来显示课程和事件的实时倒计时。你的数据仅在本地使用，不会上传。</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>StudySync 需要将倒计时事件写入你的日历。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>留时需要使用相机扫描团队项目邀请二维码。</string>
+	<string>StudySync 需要使用相机扫描团队项目邀请二维码，以及机票、高铁票等行程的条码。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>留时需要你的位置来计算到集合地点的距离和预计到达时间。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -30,6 +49,33 @@
 			</array>
 		</dict>
 	</array>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<!--
+				Register StudySync as a handler for Apple Wallet pass files
+				(.pkpass / com.apple.pkpass UTI). When the user shares a pass
+				from Wallet (or opens a .pkpass attachment from Mail / Files),
+				StudySync appears in the iOS share sheet. The URL is delivered
+				to .onOpenURL in the app root, which parses it via PassKit and
+				creates a TravelEvent. This sidesteps the PKPassLibrary
+				entitlement requirement (which Apple grants only to dedicated
+				travel apps); the user explicitly hands the pass to us.
+			-->
+			<key>CFBundleTypeName</key>
+			<string>Apple Wallet Pass</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.apple.pkpass</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>
@@ -37,8 +83,6 @@
 			<string>com.studysync.shortcut.addEvent</string>
 			<key>UIApplicationShortcutItemTitle</key>
 			<string>添加倒计时</string>
-			<key>UIApplicationShortcutItemSubtitle</key>
-			<string>Add Countdown</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeAdd</string>
 		</dict>
@@ -47,8 +91,6 @@
 			<string>com.studysync.shortcut.schedule</string>
 			<key>UIApplicationShortcutItemTitle</key>
 			<string>今日日程</string>
-			<key>UIApplicationShortcutItemSubtitle</key>
-			<string>Today&apos;s Schedule</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeDate</string>
 		</dict>
@@ -57,8 +99,6 @@
 			<string>com.studysync.shortcut.goals</string>
 			<key>UIApplicationShortcutItemTitle</key>
 			<string>学习目标</string>
-			<key>UIApplicationShortcutItemSubtitle</key>
-			<string>Study Goals</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeTask</string>
 		</dict>

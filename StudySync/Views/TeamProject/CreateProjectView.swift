@@ -3,6 +3,7 @@ import SwiftUI
 struct CreateProjectView: View {
     let viewModel: TeamProjectViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @State private var name = ""
     @State private var emoji = "📁"
@@ -57,7 +58,7 @@ struct CreateProjectView: View {
                         Text(L10n.projectEmoji)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 8) {
+                        LazyVGrid(columns: iPadGridColumns(iPhone: 8, spacing: 8, sizeClass: hSizeClass), spacing: 8) {
                             ForEach(emojiOptions, id: \.self) { option in
                                 Button {
                                     emoji = option

@@ -221,6 +221,7 @@ struct EditGradeComponentView: View {
                     Button(L10n.save) { saveScore() }
                 }
             }
+            .dismissKeyboardToolbar()
         }
         .presentationDetents([.large])
     }

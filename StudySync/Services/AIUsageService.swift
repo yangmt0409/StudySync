@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import UserNotifications
 
 @Observable
@@ -10,6 +11,9 @@ final class AIUsageService {
 
     /// In-app debug log for the most recent Claude fetch (visible in UI).
     var claudeDebugLog: String = ""
+
+    /// Model context for recording usage snapshots (set from view layer)
+    var modelContext: ModelContext?
 
     private init() {}
 
@@ -57,6 +61,9 @@ final class AIUsageService {
         if account.isAuthenticated {
             await checkAndNotify(account: account)
         }
+
+        // Record usage snapshot for trend chart (throttled to avoid flooding)
+        recordSnapshot(for: account)
 
         // Persist refreshed usage snapshot to Firestore so the latest
         // numbers survive reinstall (session still won't — user re-logs once).
@@ -303,12 +310,14 @@ final class AIUsageService {
 
     /// Extracts a utilization percentage (0-100 scale) from a window dict, handling different value formats.
     private func extractUtilization(from window: [String: Any]) -> Double {
-        // Try common field names
+        // Try common field names — "percent"/"percentage" fields are already 0-100
+        let percentFields: Set<String> = ["utilization_percentage", "percent", "percentage", "used_percent"]
         let candidates = ["utilization", "utilization_percentage", "percent", "percentage", "used_percent"]
         for key in candidates {
-            if let v = window[key] as? Double { return normalizeUtilization(v) }
+            let isPercent = percentFields.contains(key)
+            if let v = window[key] as? Double { return normalizeUtilization(v, isPercentField: isPercent) }
             if let v = window[key] as? Int { return Double(v) }
-            if let v = window[key] as? NSNumber { return normalizeUtilization(v.doubleValue) }
+            if let v = window[key] as? NSNumber { return normalizeUtilization(v.doubleValue, isPercentField: isPercent) }
         }
         // Try computing from used/limit
         if let used = window["used"] as? Double, let limit = window["limit"] as? Double, limit > 0 {
@@ -321,9 +330,13 @@ final class AIUsageService {
     }
 
     /// If value looks like a 0-1 fraction, convert to 0-100 percentage.
-    private func normalizeUtilization(_ value: Double) -> Double {
-        // Heuristic: if value is between 0 and 1 (exclusive of 1.5 to be safe), treat as fraction
-        if value > 0 && value <= 1.0 {
+    /// Uses the field name hint from extractUtilization to decide: fields named
+    /// "percent"/"percentage" are already 0-100; raw "utilization" may be 0-1.
+    private func normalizeUtilization(_ value: Double, isPercentField: Bool = false) -> Double {
+        // If the field is explicitly named "percent"/"percentage", trust the value as-is
+        if isPercentField { return value }
+        // Heuristic: if value is between 0 and 1 (exclusive), treat as fraction
+        if value > 0 && value < 1.0 {
             return value * 100.0
         }
         return value
@@ -497,10 +510,64 @@ final class AIUsageService {
     func fetchAllUsage(accounts: [AIAccount]) async {
         isFetching = true
         fetchError = nil
-        for account in accounts where account.isEnabled && account.isAuthenticated {
-            await performFetch(for: account)
+        // Fetch all accounts in parallel for faster refresh
+        await withTaskGroup(of: Void.self) { group in
+            for account in accounts where account.isEnabled && account.isAuthenticated {
+                group.addTask { @MainActor in
+                    await self.performFetch(for: account)
+                }
+            }
         }
         isFetching = false
+    }
+
+    // MARK: - Usage Snapshots (Trend Tracking)
+
+    /// Records a usage snapshot for trend charts. Throttled to one per 4 minutes per account.
+    @MainActor
+    private func recordSnapshot(for account: AIAccount) {
+        guard let ctx = modelContext else { return }
+
+        // Throttle: skip if a recent snapshot exists for this account
+        let accountId = account.id
+        let cutoff = Date().addingTimeInterval(-AIUsageSnapshot.minInterval)
+        let descriptor = FetchDescriptor<AIUsageSnapshot>(
+            predicate: #Predicate { $0.accountId == accountId && $0.timestamp > cutoff }
+        )
+        if let count = try? ctx.fetchCount(descriptor), count > 0 { return }
+
+        let u1: Double
+        let u2: Double
+        switch account.provider {
+        case .claude:
+            u1 = account.utilization5h
+            u2 = account.utilization7d
+        case .openai:
+            u1 = account.codexUtilization
+            u2 = 0
+        case .google:
+            u1 = account.utilization5h
+            u2 = account.utilization7d
+        }
+
+        let snapshot = AIUsageSnapshot(accountId: accountId, utilization1: u1, utilization2: u2)
+        ctx.insert(snapshot)
+
+        // Prune old snapshots (older than 7 days)
+        pruneOldSnapshots(ctx: ctx)
+    }
+
+    /// Removes snapshots older than 7 days to keep storage bounded.
+    private func pruneOldSnapshots(ctx: ModelContext) {
+        let cutoff = Date().addingTimeInterval(-AIUsageSnapshot.maxAge)
+        let descriptor = FetchDescriptor<AIUsageSnapshot>(
+            predicate: #Predicate { $0.timestamp < cutoff }
+        )
+        if let old = try? ctx.fetch(descriptor) {
+            for snapshot in old {
+                ctx.delete(snapshot)
+            }
+        }
     }
 
     // MARK: - (Claude API calls now go through ClaudeAPIFetcher which uses WebView)

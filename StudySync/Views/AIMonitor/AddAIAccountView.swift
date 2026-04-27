@@ -28,12 +28,26 @@ struct AddAIAccountView: View {
                     .padding(.horizontal, 32)
 
                 VStack(spacing: 12) {
-                    ForEach(AIProvider.allCases, id: \.self) { provider in
+                    ForEach(AIProvider.availableCases, id: \.self) { provider in
                         providerButton(provider)
                     }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
+
+                // Unofficial-integration disclaimer (App Store Guideline 5.2.3 risk mitigation)
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(L10n.aiMonitorDisclaimer)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 4)
 
                 Spacer()
                 Spacer()

@@ -18,20 +18,22 @@ struct ExchangeRateView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: SSSpacing.xl) {
                 rateCard
                 calculatorCard
                 quickAmounts
                 currencyPairSelector
                 statusBar
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, SSSpacing.xl)
+            .padding(.top, SSSpacing.md)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background {
             Color(.systemGroupedBackground)
                 .ignoresSafeArea()
         }
+        .dismissKeyboardToolbar()
         .task {
             await service.fetchRates()
         }
@@ -43,7 +45,7 @@ struct ExchangeRateView: View {
     // MARK: - Rate Card
 
     private var rateCard: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SSSpacing.lg) {
             HStack {
                 Text("\(selectedPair.fromFlag) \(selectedPair.from)")
                     .font(.system(size: 18, weight: .semibold))
@@ -62,15 +64,15 @@ struct ExchangeRateView: View {
             Text(String(format: "1 %@ = %.4f %@",
                          selectedPair.from, currentRate, selectedPair.to))
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(hex: "#5B7FFF"))
+                .foregroundStyle(SSColor.brand)
         }
-        .padding(20)
+        .padding(SSSpacing.xxl)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(.background)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .stroke(Color(.separator).opacity(0.2), lineWidth: 1)
         )
     }
@@ -78,7 +80,7 @@ struct ExchangeRateView: View {
     // MARK: - Calculator
 
     private var calculatorCard: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: SSSpacing.xl) {
             HStack {
                 Text(isReversed ? selectedPair.toFlag : selectedPair.fromFlag)
                     .font(.system(size: 24))
@@ -89,7 +91,7 @@ struct ExchangeRateView: View {
                     .multilineTextAlignment(.trailing)
 
                 Text(isReversed ? selectedPair.to : selectedPair.from)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(SSFont.bodyMedium)
                     .foregroundStyle(.secondary)
             }
 
@@ -101,7 +103,7 @@ struct ExchangeRateView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(Color(hex: "#5B7FFF"))
+                    .foregroundStyle(SSColor.brand)
                     .rotationEffect(.degrees(isReversed ? 180 : 0))
             }
 
@@ -113,16 +115,16 @@ struct ExchangeRateView: View {
 
                 Text(String(format: "%.2f", convertedAmount))
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(hex: "#4ECDC4"))
+                    .foregroundStyle(SSColor.travel)
 
                 Text(isReversed ? selectedPair.from : selectedPair.to)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(SSFont.bodyMedium)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(20)
+        .padding(SSSpacing.xxl)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(.background)
         )
     }
@@ -131,21 +133,21 @@ struct ExchangeRateView: View {
 
     private var quickAmounts: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: SSSpacing.mdLg) {
                 ForEach([100, 500, 1000, 5000, 10000], id: \.self) { amount in
                     Button {
                         inputAmount = "\(amount)"
                         HapticEngine.shared.lightImpact()
                     } label: {
                         Text("\(amount)")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(SSFont.chipLabel)
                             .foregroundStyle(inputAmount == "\(amount)" ? .white : .primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, SSSpacing.xl)
+                            .padding(.vertical, SSSpacing.md)
                             .background(
                                 Capsule()
                                     .fill(inputAmount == "\(amount)"
-                                          ? Color(hex: "#5B7FFF") : Color(.tertiarySystemFill))
+                                          ? SSColor.brand : Color(.tertiarySystemFill))
                             )
                     }
                 }
@@ -156,7 +158,7 @@ struct ExchangeRateView: View {
     // MARK: - Currency Pair Selector
 
     private var currencyPairSelector: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: SSSpacing.mdLg) {
             Text(L10n.currencyPair)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -167,16 +169,16 @@ struct ExchangeRateView: View {
                         selectedPair = pair
                         HapticEngine.shared.selection()
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: SSSpacing.mdLg) {
                             Text(pair.fromFlag)
                                 .font(.system(size: 20))
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(pair.from)
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(SSFont.bodySmallSemibold)
                                     .foregroundStyle(.primary)
                                 Text(pair.fromName)
-                                    .font(.system(size: 12))
+                                    .font(SSFont.footnote)
                                     .foregroundStyle(.secondary)
                             }
 
@@ -191,11 +193,11 @@ struct ExchangeRateView: View {
                             if selectedPair.id == pair.id {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 16))
-                                    .foregroundStyle(Color(hex: "#5B7FFF"))
+                                    .foregroundStyle(SSColor.brand)
                             }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
+                        .padding(.vertical, SSSpacing.lg)
+                        .padding(.horizontal, SSSpacing.xl)
                     }
 
                     if index < CurrencyPair.popular.count - 1 {
@@ -205,7 +207,7 @@ struct ExchangeRateView: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                     .fill(.background)
             )
         }
@@ -219,7 +221,7 @@ struct ExchangeRateView: View {
                 Image(systemName: "wifi.slash")
                     .foregroundStyle(.orange)
                 Text(L10n.offlineData)
-                    .font(.system(size: 12))
+                    .font(SSFont.footnote)
                     .foregroundStyle(.orange)
             }
 
@@ -227,7 +229,7 @@ struct ExchangeRateView: View {
 
             if let date = service.lastUpdated {
                 Text(L10n.updatedAt + date.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 12))
+                    .font(SSFont.footnote)
                     .foregroundStyle(.secondary)
             }
 
@@ -236,8 +238,8 @@ struct ExchangeRateView: View {
                     .scaleEffect(0.7)
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 16)
+        .padding(.horizontal, SSSpacing.xs)
+        .padding(.bottom, SSSpacing.xl)
     }
 }
 

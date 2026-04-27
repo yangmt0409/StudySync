@@ -210,8 +210,15 @@ struct AIUsageCardView: View {
     private var footerRow: some View {
         HStack {
             if let lastFetched = account.lastFetchedAt {
-                Image(systemName: "clock")
-                    .font(.caption2)
+                // Stale data indicator (> 30 minutes old)
+                if Date().timeIntervalSince(lastFetched) > 1800 {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                } else {
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                }
                 Text(L10n.aiLastUpdated)
                     .font(.caption2)
                 Text(lastFetched, style: .relative)
@@ -224,13 +231,21 @@ struct AIUsageCardView: View {
         .foregroundStyle(.tertiary)
     }
 
-    // MARK: - Peak Hour (Toronto 8AM-2PM, America/Toronto)
+    // MARK: - Peak Hour (user-configurable timezone, default: America/Toronto)
 
-    private static let torontoTZ = TimeZone(identifier: "America/Toronto")!
+    /// Peak hour timezone — reads from UserDefaults, defaults to Toronto.
+    /// Users can change this in AI Monitor settings.
+    private static var peakTimeZone: TimeZone {
+        if let id = UserDefaults.standard.string(forKey: "ai_peak_timezone"),
+           let tz = TimeZone(identifier: id) {
+            return tz
+        }
+        return TimeZone(identifier: "America/Toronto")!
+    }
 
     static var isPeakHour: Bool {
         var cal = Calendar.current
-        cal.timeZone = torontoTZ
+        cal.timeZone = peakTimeZone
         let now = Date()
         let weekday = cal.component(.weekday, from: now)
         let hour = cal.component(.hour, from: now)
@@ -241,7 +256,7 @@ struct AIUsageCardView: View {
     static var peakEndDate: Date? {
         guard isPeakHour else { return nil }
         var cal = Calendar.current
-        cal.timeZone = torontoTZ
+        cal.timeZone = peakTimeZone
         let now = Date()
         var comps = cal.dateComponents([.year, .month, .day], from: now)
         comps.hour = 14

@@ -10,7 +10,9 @@ struct CheckCountdownIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let container = SharedModelContainer.create()
+        // See AddCountdownIntent — prefer the main app's container to avoid
+        // the in-process duplicate-container corruption that hit v1.0.
+        let container = AppContainer.shared.container ?? SharedModelContainer.create()
         let context = ModelContext(container)
         let descriptor = FetchDescriptor<CountdownEvent>()
 

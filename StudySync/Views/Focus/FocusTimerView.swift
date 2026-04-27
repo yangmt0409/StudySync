@@ -2,16 +2,36 @@ import SwiftUI
 import SwiftData
 import FirebaseAuth
 
+nonisolated enum FocusTimerState: Equatable {
+    case idle, running, paused, breakTime, breakPaused
+}
+
 struct FocusTimerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+
+    /// Outer glow ring size — base 280pt on iPhone, scaled up on iPad so the
+    /// timer doesn't look like a small token in the middle of the canvas.
+    private var ringOuterSize: CGFloat {
+        ipScaled(280, scale: 1.5, sizeClass: hSizeClass)
+    }
+    /// Inner track + progress ring size (must stay proportional to outer).
+    private var ringInnerSize: CGFloat {
+        ipScaled(230, scale: 1.5, sizeClass: hSizeClass)
+    }
+    /// Tip-dot rotation radius — exactly half of the inner ring diameter so
+    /// the dot orbits along the stroke center line.
+    private var ringTipOffset: CGFloat {
+        -ringInnerSize / 2
+    }
 
     @Query(sort: \FocusSession.startedAt, order: .reverse)
     private var allSessions: [FocusSession]
 
     // Timer state
-    @State private var timerState: TimerState = .idle
+    @State private var timerState: FocusTimerState = .idle
     @State private var selectedMinutes: Int = 25
     @State private var remainingSeconds: Int = 25 * 60
     @State private var elapsedSeconds: Int = 0
@@ -22,6 +42,9 @@ struct FocusTimerView: View {
     // UI
     @State private var selectedEmoji = "📚"
     @State private var showHistory = false
+    @State private var showAnalytics = false
+    @State private var joinStudyRoom = false
+    @State private var showStudyRoom = false
     @State private var pulseRing = false
     @State private var breathe = false
     @State private var hasAppeared = false
@@ -29,13 +52,22 @@ struct FocusTimerView: View {
     @State private var backgroundedAt: Date?
     @State private var showChallengeUnlocked = false
     @State private var showGiveUpAlert = false
+    @State private var showGroupFocus = false
+    @State private var showStudySpace = false
+
+    @Query private var unlockedSpaceItems: [StudySpaceItem]
+
+    private var unlockedCount: Int { unlockedSpaceItems.count }
+
+    // Pomodoro / break state
+    @State private var pomodoroCount: Int = 0
+    @State private var isLongBreak: Bool = false
+    @State private var shortBreakMinutes: Int = 5
+    @State private var longBreakMinutes: Int = 15
+    @State private var pomodorosForLongBreak: Int = 4
 
     private let presetMinutes = [15, 25, 30, 45, 60, 90]
     private let emojis = ["📚", "💻", "✍️", "🎯", "🧪", "📐", "🎨", "🔬"]
-
-    enum TimerState {
-        case idle, running, paused
-    }
 
     // MARK: - Computed
 
@@ -96,8 +128,15 @@ struct FocusTimerView: View {
         min(Double(monthlyChallengeMinutes) / Double(challengeGoalMinutes), 1.0)
     }
 
-    private var ringColor1: Color { Color(hex: "#5B7FFF") }
-    private var ringColor2: Color { Color(hex: "#7C3AED") }
+    private var ringColor1: Color { SSColor.brand }
+    private var ringColor2: Color { SSColor.brandPurple }
+
+    private var currentRingColor1: Color {
+        timerState == .breakTime || timerState == .breakPaused ? Color(hex: "#10B981") : ringColor1
+    }
+    private var currentRingColor2: Color {
+        timerState == .breakTime || timerState == .breakPaused ? Color(hex: "#06B6D4") : ringColor2
+    }
 
     var body: some View {
         NavigationStack {
@@ -110,11 +149,11 @@ struct FocusTimerView: View {
                     VStack(spacing: 0) {
                         // Timer area
                         timerSection
-                            .padding(.top, 8)
+                            .padding(.top, SSSpacing.md)
 
                         // Bottom card
                         bottomCard
-                            .padding(.top, 24)
+                            .padding(.top, SSSpacing.xxxl)
                     }
                     .padding(.horizontal, SSSpacing.xl)
                     .padding(.bottom, SSSpacing.xxl)
@@ -128,6 +167,24 @@ struct FocusTimerView: View {
             .navigationTitle(L10n.focusTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showAnalytics = true
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(SSColor.brand)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showStudyRoom = true
+                    } label: {
+                        Image(systemName: "person.2.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(joinStudyRoom ? SSColor.brand : .secondary)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showHistory = true
@@ -138,8 +195,20 @@ struct FocusTimerView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showAnalytics) {
+                StudyAnalyticsView()
+            }
             .sheet(isPresented: $showHistory) {
                 FocusHistoryView()
+            }
+            .sheet(isPresented: $showStudyRoom) {
+                StudyRoomView()
+            }
+            .sheet(isPresented: $showGroupFocus) {
+                GroupFocusView()
+            }
+            .sheet(isPresented: $showStudySpace) {
+                StudySpaceView()
             }
             .alert(L10n.focusGiveUpTitle, isPresented: $showGiveUpAlert) {
                 Button(L10n.focusGiveUpConfirm, role: .destructive) { giveUp() }
@@ -150,12 +219,35 @@ struct FocusTimerView: View {
             .onAppear {
                 withAnimation(.spring(duration: 0.6)) { hasAppeared = true }
             }
+            .task {
+                // Pull focus history from Firestore on tab appearance.
+                // Restores analytics + study space unlocks after reinstall
+                // / new device login.
+                await FocusSessionSyncService.shared.pullAll(context: modelContext)
+            }
             .onDisappear {
-                timer?.invalidate()
-                timer = nil
+                // DO NOT invalidate the timer here. This view sits inside
+                // a TabView and `.onDisappear` fires on every tab switch —
+                // killing the timer made the running focus session freeze
+                // (timerState stayed `.running` but ticks stopped, so the
+                // user perceived "auto-paused" and had to tap Pause →
+                // Resume to recover).
+                //
+                // Legitimate cleanup happens in:
+                //   • pauseTimer()      — explicit pause button
+                //   • completeSession() — timer hit zero
+                //   • giveUp()          — user abandoned
+                //   • scenePhase → .background — full app backgrounded
+                //     (with proper "elapsed catch-up" on return)
+                //
+                // For genuinely terminal dismissal (rare — TabView caches
+                // this view across tab switches) the timer is reclaimed
+                // when the @State storage is finally torn down. A leaked
+                // timer cost is negligible and far better than freezing
+                // an active focus session.
             }
             .onChange(of: scenePhase) { _, newPhase in
-                guard timerState == .running else { return }
+                guard timerState == .running || timerState == .breakTime else { return }
                 if newPhase == .background {
                     backgroundedAt = Date()
                     timer?.invalidate()
@@ -166,7 +258,11 @@ struct FocusTimerView: View {
                     remainingSeconds = max(0, remainingSeconds - elapsed)
                     elapsedSeconds += elapsed
                     if remainingSeconds <= 0 {
-                        completeSession()
+                        if timerState == .running {
+                            completeSession()
+                        } else {
+                            completeBreak()
+                        }
                     } else {
                         scheduleTimer()
                     }
@@ -179,10 +275,10 @@ struct FocusTimerView: View {
 
     private var backgroundGradient: some View {
         Group {
-            if timerState == .running {
+            if timerState == .running || timerState == .breakTime {
                 LinearGradient(
                     colors: [
-                        ringColor2.opacity(colorScheme == .dark ? 0.08 : 0.04),
+                        currentRingColor2.opacity(colorScheme == .dark ? 0.08 : 0.04),
                         SSColor.backgroundPrimary
                     ],
                     startPoint: .top,
@@ -201,18 +297,18 @@ struct FocusTimerView: View {
         VStack(spacing: 0) {
             // Ring
             ZStack {
-                // Outer glow when running
-                if timerState == .running {
+                // Outer glow when running or on break
+                if timerState == .running || timerState == .breakTime {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [ringColor2.opacity(0.12), .clear],
+                                colors: [currentRingColor2.opacity(SSOpacity.tagBackground), .clear],
                                 center: .center,
                                 startRadius: 100,
                                 endRadius: 160
                             )
                         )
-                        .frame(width: 280, height: 280)
+                        .frame(width: ringOuterSize, height: ringOuterSize)
                         .scaleEffect(breathe ? 1.08 : 1.0)
                         .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: breathe)
                         .onAppear { breathe = true }
@@ -227,35 +323,35 @@ struct FocusTimerView: View {
                             : Color.black.opacity(0.04),
                         lineWidth: 12
                     )
-                    .frame(width: 230, height: 230)
+                    .frame(width: ringInnerSize, height: ringInnerSize)
 
                 // Progress arc
                 Circle()
                     .trim(from: 0, to: min(progress, 1.0))
                     .stroke(
                         AngularGradient(
-                            colors: [ringColor1, ringColor2, ringColor1],
+                            colors: [currentRingColor1, currentRingColor2, currentRingColor1],
                             center: .center
                         ),
                         style: StrokeStyle(lineWidth: 12, lineCap: .round)
                     )
-                    .frame(width: 230, height: 230)
+                    .frame(width: ringInnerSize, height: ringInnerSize)
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.3), value: progress)
-                    .shadow(color: ringColor2.opacity(timerState == .running ? 0.4 : 0), radius: 8)
+                    .shadow(color: currentRingColor2.opacity(timerState == .running || timerState == .breakTime ? SSOpacity.disabled : 0), radius: 8)
 
                 // Dot at tip
                 if progress > 0.01 {
                     Circle()
                         .fill(.white)
                         .frame(width: 6, height: 6)
-                        .shadow(color: ringColor2.opacity(0.6), radius: 4)
-                        .offset(y: -115)
+                        .shadow(color: currentRingColor2.opacity(SSOpacity.muted), radius: 4)
+                        .offset(y: ringTipOffset)
                         .rotationEffect(.degrees(360 * progress))
                 }
 
                 // Center content
-                VStack(spacing: 6) {
+                VStack(spacing: SSSpacing.sm) {
                     Text(selectedEmoji)
                         .font(.system(size: 40))
 
@@ -272,8 +368,17 @@ struct FocusTimerView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.8)))
                     } else if timerState == .idle {
                         Text(L10n.focusMinutes(selectedMinutes))
-                            .font(.system(size: 13))
+                            .font(SSFont.caption)
                             .foregroundStyle(.tertiary)
+                    } else if timerState == .breakTime {
+                        Text(isLongBreak ? L10n.focusLongBreak : L10n.focusShortBreak)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(hex: "#10B981"))
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    } else if timerState == .breakPaused {
+                        Text(L10n.focusPause)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.orange)
                     } else {
                         Text(L10n.focusPause)
                             .font(.system(size: 12, weight: .medium))
@@ -286,7 +391,7 @@ struct FocusTimerView: View {
 
             // Controls
             controlButtons
-                .padding(.top, 20)
+                .padding(.top, SSSpacing.xxl)
         }
         .opacity(hasAppeared ? 1 : 0)
         .offset(y: hasAppeared ? 0 : 30)
@@ -295,9 +400,33 @@ struct FocusTimerView: View {
     // MARK: - Bottom Card
 
     private var bottomCard: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: SSSpacing.xl) {
             // Stats
             statsBar
+
+            // Pomodoro streak indicator
+            if pomodoroCount > 0 {
+                HStack(spacing: SSSpacing.sm) {
+                    ForEach(0..<pomodorosForLongBreak, id: \.self) { i in
+                        let filledCount = pomodoroCount % pomodorosForLongBreak == 0 && pomodoroCount > 0
+                            ? pomodorosForLongBreak
+                            : pomodoroCount % pomodorosForLongBreak
+                        Circle()
+                            .fill(i < filledCount ? currentRingColor2 : Color(.tertiarySystemFill))
+                            .frame(width: 8, height: 8)
+                    }
+                    Text("\(pomodoroCount)")
+                        .font(SSFont.badge)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, SSSpacing.mdLg)
+                .padding(.horizontal, SSSpacing.xl)
+                .background(
+                    RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                        .fill(SSColor.backgroundCard)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
 
             // Focus challenge
             challengeCard
@@ -309,6 +438,63 @@ struct FocusTimerView: View {
 
                 emojiPicker
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+                studyRoomToggle
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+                // Group focus button
+                Button { showGroupFocus = true } label: {
+                    HStack(spacing: SSSpacing.md) {
+                        Image(systemName: "person.3.fill")
+                            .font(.title3)
+                            .foregroundStyle(Color(hex: "#F59E0B"))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.groupFocusTitle)
+                                .font(SSFont.bodyMedium)
+                                .foregroundStyle(.primary)
+                            Text(L10n.groupFocusBonusShort)
+                                .font(SSFont.caption)
+                                .foregroundStyle(Color(hex: "#F59E0B"))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(SSFont.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(SSSpacing.xl)
+                    .background(RoundedRectangle(cornerRadius: SSRadius.card).fill(SSColor.backgroundCard))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+                // My Study Space
+                Button { showStudySpace = true } label: {
+                    HStack(spacing: SSSpacing.md) {
+                        Image(systemName: "desktopcomputer")
+                            .font(.title3)
+                            .foregroundStyle(Color(hex: "#F59E0B"))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.studySpaceTitle)
+                                .font(SSFont.bodyMedium)
+                                .foregroundStyle(.primary)
+                            Text(L10n.studySpaceSubtitle)
+                                .font(SSFont.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        // Show unlocked count
+                        Text("\(unlockedCount)/\(StudySpaceItem.catalog.count)")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(SSFont.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(SSSpacing.xl)
+                    .background(RoundedRectangle(cornerRadius: SSRadius.card).fill(SSColor.backgroundCard))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .animation(.spring(duration: 0.4), value: timerState)
@@ -344,7 +530,7 @@ struct FocusTimerView: View {
                 color: .green
             )
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, SSSpacing.xl)
         .background(
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(SSColor.backgroundCard)
@@ -360,7 +546,7 @@ struct FocusTimerView: View {
     private func miniStat(value: String, unit: String?, label: String, icon: String, color: Color) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(SSFont.secondary)
                 .foregroundStyle(color)
 
             HStack(spacing: 2) {
@@ -368,7 +554,7 @@ struct FocusTimerView: View {
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                 if let unit {
                     Text(unit)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(SSFont.badge)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -384,12 +570,12 @@ struct FocusTimerView: View {
     // MARK: - Preset Picker
 
     private var presetPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: SSSpacing.mdLg) {
             Text(L10n.focusDuration)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 8) {
+            HStack(spacing: SSSpacing.md) {
                 ForEach(presetMinutes, id: \.self) { mins in
                     Button {
                         withAnimation(.spring(duration: 0.25)) {
@@ -404,7 +590,7 @@ struct FocusTimerView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 11)
                             .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                                     .fill(selectedMinutes == mins
                                           ? LinearGradient(colors: [ringColor1, ringColor2], startPoint: .topLeading, endPoint: .bottomTrailing)
                                           : LinearGradient(colors: [Color(.tertiarySystemFill)], startPoint: .top, endPoint: .bottom))
@@ -413,7 +599,7 @@ struct FocusTimerView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(SSColor.backgroundCard)
@@ -435,19 +621,41 @@ struct FocusTimerView: View {
                         .frame(height: 44)
                         .background(
                             Circle()
-                                .fill(selectedEmoji == e ? ringColor2.opacity(0.15) : Color.clear)
+                                .fill(selectedEmoji == e ? ringColor2.opacity(SSOpacity.lightTint) : Color.clear)
                                 .frame(width: 42, height: 42)
                         )
                         .scaleEffect(selectedEmoji == e ? 1.15 : 1.0)
                 }
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
+        .padding(.vertical, SSSpacing.md)
+        .padding(.horizontal, SSSpacing.md)
         .background(
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(SSColor.backgroundCard)
         )
+    }
+
+    // MARK: - Study Room Toggle
+
+    private var studyRoomToggle: some View {
+        HStack(spacing: SSSpacing.md) {
+            Image(systemName: "person.2.fill")
+                .font(.title3)
+                .foregroundStyle(SSColor.brand)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.studyRoomJoin)
+                    .font(SSFont.bodyMedium)
+                Text(L10n.studyRoomJoinDesc)
+                    .font(SSFont.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Toggle("", isOn: $joinStudyRoom)
+                .labelsHidden()
+        }
+        .padding(SSSpacing.xl)
+        .background(RoundedRectangle(cornerRadius: SSRadius.card).fill(SSColor.backgroundCard))
     }
 
     // MARK: - Challenge Card
@@ -473,31 +681,31 @@ struct FocusTimerView: View {
         let goalHours = Double(challengeGoalMinutes) / 60.0
         let claimed = store.focusChallengeClaimedThisMonth
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: SSSpacing.lg) {
             // Header row
-            HStack(spacing: 8) {
+            HStack(spacing: SSSpacing.md) {
                 Text(claimed ? "✅" : "🔥")
                     .font(.system(size: 20))
                 Text(L10n.focusChallenge)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(SSFont.bodySmallSemibold)
                 Spacer()
                 Text(L10n.focusChallengeDeadline)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(SSFont.badge)
                     .foregroundStyle(.orange)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, SSSpacing.md)
                     .padding(.vertical, 3)
                     .background(Color.orange.opacity(0.1), in: Capsule())
             }
 
             if !claimed {
                 Text(L10n.focusChallengeDesc)
-                    .font(.system(size: 13))
+                    .font(SSFont.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             // Progress bar
-            VStack(spacing: 6) {
+            VStack(spacing: SSSpacing.sm) {
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -522,14 +730,14 @@ struct FocusTimerView: View {
                     if claimed {
                         if let expiry = store.proRewardExpiresAt {
                             Text(L10n.focusChallengeRewardExpiry(formatExpiry(expiry)))
-                                .font(.system(size: 11, weight: .medium))
+                                .font(SSFont.badge)
                                 .foregroundStyle(.green)
                         }
                     } else {
                         let remaining = goalHours - challengeHours
                         if remaining > 0 {
                             Text(L10n.focusChallengeRemaining(String(format: "%.1f", remaining)))
-                                .font(.system(size: 12))
+                                .font(SSFont.footnote)
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -538,9 +746,9 @@ struct FocusTimerView: View {
 
             // Foreground-only note
             if !claimed {
-                HStack(spacing: 4) {
+                HStack(spacing: SSSpacing.xs) {
                     Image(systemName: "iphone")
-                        .font(.system(size: 10))
+                        .font(SSFont.micro)
                     Text(L10n.focusChallengeForegroundNote)
                         .font(.system(size: 11))
                 }
@@ -549,16 +757,16 @@ struct FocusTimerView: View {
 
             // Show active reward even when not yet claimed this month
             if !claimed, let expiry = store.proRewardExpiresAt, store.hasActiveProReward {
-                HStack(spacing: 4) {
+                HStack(spacing: SSSpacing.xs) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11))
                     Text(L10n.focusChallengeRewardExpiry(formatExpiry(expiry)))
-                        .font(.system(size: 12))
+                        .font(SSFont.footnote)
                 }
                 .foregroundStyle(ringColor2)
             }
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(SSColor.backgroundCard)
@@ -567,7 +775,7 @@ struct FocusTimerView: View {
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .strokeBorder(
                     claimed
-                        ? Color.green.opacity(0.3)
+                        ? Color.green.opacity(SSOpacity.elevatedShadow)
                         : challengeProgress > 0.7 ? ringColor2.opacity(0.2) : Color.clear,
                     lineWidth: 1
                 )
@@ -576,29 +784,29 @@ struct FocusTimerView: View {
 
     // Ended challenge — only shows if the user still has an active reward
     private func challengeEndedCard(expiry: Date) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SSSpacing.mdLg) {
             Text("⏰")
                 .font(.system(size: 20))
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.focusChallenge)
                     .font(.system(size: 14, weight: .semibold))
-                HStack(spacing: 4) {
+                HStack(spacing: SSSpacing.xs) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 10))
+                        .font(SSFont.micro)
                     Text(L10n.focusChallengeRewardExpiry(formatExpiry(expiry)))
-                        .font(.system(size: 12))
+                        .font(SSFont.footnote)
                 }
                 .foregroundStyle(ringColor2)
             }
             Spacer()
             Text(L10n.focusChallengeEnded)
-                .font(.system(size: 11, weight: .medium))
+                .font(SSFont.badge)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, SSSpacing.md)
                 .padding(.vertical, 3)
                 .background(Color(.tertiarySystemFill), in: Capsule())
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
             RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(SSColor.backgroundCard)
@@ -608,11 +816,11 @@ struct FocusTimerView: View {
     // MARK: - Control Buttons
 
     private var controlButtons: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: SSSpacing.lgXl) {
             switch timerState {
             case .idle:
                 Button { startTimer() } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SSSpacing.mdLg) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 18))
                         Text(L10n.focusStart)
@@ -622,18 +830,18 @@ struct FocusTimerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                             .fill(
                                 LinearGradient(colors: [ringColor1, ringColor2],
                                                startPoint: .leading, endPoint: .trailing)
                             )
                     )
-                    .shadow(color: ringColor2.opacity(0.3), radius: 12, y: 6)
+                    .shadow(color: ringColor2.opacity(SSOpacity.elevatedShadow), radius: 12, y: 6)
                 }
 
             case .running:
                 Button { pauseTimer() } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SSSpacing.mdLg) {
                         Image(systemName: "pause.fill")
                             .font(.system(size: 18))
                         Text(L10n.focusPause)
@@ -643,7 +851,7 @@ struct FocusTimerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                             .fill(Color.orange.gradient)
                     )
                 }
@@ -652,7 +860,7 @@ struct FocusTimerView: View {
 
             case .paused:
                 Button { resumeTimer() } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SSSpacing.mdLg) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 18))
                         Text(L10n.focusResume)
@@ -662,12 +870,78 @@ struct FocusTimerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                             .fill(Color.green.gradient)
                     )
                 }
 
                 giveUpButton
+
+            case .breakTime:
+                Button { pauseBreak() } label: {
+                    HStack(spacing: SSSpacing.mdLg) {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 18))
+                        Text(L10n.focusPause)
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(
+                        RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#10B981"), Color(hex: "#06B6D4")],
+                                    startPoint: .leading, endPoint: .trailing
+                                )
+                            )
+                    )
+                }
+
+                Button { skipBreak() } label: {
+                    Text(L10n.focusSkipBreak)
+                        .font(SSFont.bodySmallMedium)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                                .fill(Color(.tertiarySystemFill))
+                        )
+                }
+
+            case .breakPaused:
+                Button { resumeBreak() } label: {
+                    HStack(spacing: SSSpacing.mdLg) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18))
+                        Text(L10n.focusResume)
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(
+                        RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#10B981"), Color(hex: "#06B6D4")],
+                                    startPoint: .leading, endPoint: .trailing
+                                )
+                            )
+                    )
+                }
+
+                Button { skipBreak() } label: {
+                    Text(L10n.focusSkipBreak)
+                        .font(SSFont.bodySmallMedium)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                                .fill(Color(.tertiarySystemFill))
+                        )
+                }
             }
         }
         .animation(.spring(duration: 0.3), value: timerState)
@@ -676,12 +950,12 @@ struct FocusTimerView: View {
     private var giveUpButton: some View {
         Button { showGiveUpAlert = true } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 17, weight: .semibold))
+                .font(SSFont.heading3)
                 .foregroundStyle(.red)
                 .frame(width: 56, height: 56)
                 .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.red.opacity(colorScheme == .dark ? 0.15 : 0.08))
+                    RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
+                        .fill(.red.opacity(colorScheme == .dark ? SSOpacity.lightTint : SSOpacity.shadow))
                 )
         }
     }
@@ -690,14 +964,14 @@ struct FocusTimerView: View {
 
     private var completionOverlay: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            Color.black.opacity(SSOpacity.elevatedShadow)
                 .ignoresSafeArea()
                 .onTapGesture { withAnimation {
                     showComplete = false
                     showChallengeUnlocked = false
                 } }
 
-            VStack(spacing: 20) {
+            VStack(spacing: SSSpacing.xxl) {
                 Text(showChallengeUnlocked ? "🏆" : "🎉")
                     .font(.system(size: 56))
 
@@ -712,16 +986,16 @@ struct FocusTimerView: View {
 
                 // Challenge reward banner
                 if showChallengeUnlocked, let expiry = StoreManager.shared.proRewardExpiresAt {
-                    HStack(spacing: 6) {
+                    HStack(spacing: SSSpacing.sm) {
                         Image(systemName: "crown.fill")
                             .foregroundStyle(.orange)
                         Text(L10n.focusChallengeRewardExpiry(formatExpiry(expiry)))
-                            .font(.system(size: 14, weight: .medium))
+                            .font(SSFont.chipLabel)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, SSSpacing.xl)
+                    .padding(.vertical, SSSpacing.mdLg)
                     .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                             .fill(Color.orange.opacity(0.1))
                     )
                 }
@@ -733,12 +1007,12 @@ struct FocusTimerView: View {
                     }
                 } label: {
                     Text(L10n.done)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(SSFont.bodySemibold)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, SSSpacing.lgXl)
                         .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                                 .fill(
                                     showChallengeUnlocked
                                         ? LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
@@ -766,11 +1040,27 @@ struct FocusTimerView: View {
 
         let session = FocusSession(durationMinutes: selectedMinutes, emoji: selectedEmoji)
         modelContext.insert(session)
+        FocusSessionSyncService.shared.pushSession(session)
         currentSession = session
 
         withAnimation(.spring(duration: 0.4)) { timerState = .running }
         scheduleTimer()
         HapticEngine.shared.success()
+
+        if joinStudyRoom,
+           let uid = AuthService.shared.currentUser?.uid,
+           let profile = AuthService.shared.userProfile {
+            let member = StudyRoomMember(
+                id: uid,
+                displayName: profile.displayName,
+                avatarEmoji: profile.avatarEmoji,
+                focusEmoji: selectedEmoji,
+                focusDurationMinutes: selectedMinutes,
+                startedAt: Date(),
+                updatedAt: Date()
+            )
+            Task { await FirestoreService.shared.joinStudyRoom(member: member) }
+        }
     }
 
     private func pauseTimer() {
@@ -790,9 +1080,12 @@ struct FocusTimerView: View {
         timer?.invalidate()
         timer = nil
         if let session = currentSession {
+            let sessionId = session.id
             modelContext.delete(session)
+            FocusSessionSyncService.shared.deleteSession(id: sessionId)
         }
         currentSession = nil
+        pomodoroCount = 0
         withAnimation(.spring(duration: 0.4)) {
             timerState = .idle
             remainingSeconds = selectedMinutes * 60
@@ -800,6 +1093,10 @@ struct FocusTimerView: View {
             foregroundElapsedSeconds = 0
         }
         HapticEngine.shared.warning()
+
+        if joinStudyRoom, let uid = AuthService.shared.currentUser?.uid {
+            Task { await FirestoreService.shared.leaveStudyRoom(uid: uid) }
+        }
     }
 
     private func completeSession() {
@@ -811,6 +1108,7 @@ struct FocusTimerView: View {
             session.actualSeconds = elapsedSeconds
             session.foregroundSeconds = foregroundElapsedSeconds
             session.endedAt = Date()
+            FocusSessionSyncService.shared.pushSession(session)
         }
 
         syncFocusStats()
@@ -818,12 +1116,51 @@ struct FocusTimerView: View {
         currentSession = nil
 
         withAnimation(.spring(duration: 0.5)) {
+            showComplete = true
+        }
+
+        if joinStudyRoom, let uid = AuthService.shared.currentUser?.uid {
+            Task { await FirestoreService.shared.leaveStudyRoom(uid: uid) }
+        }
+
+        pomodoroCount += 1
+        isLongBreak = pomodoroCount % pomodorosForLongBreak == 0
+        startBreak()
+    }
+
+    private func startBreak() {
+        let breakMins = isLongBreak ? longBreakMinutes : shortBreakMinutes
+        remainingSeconds = breakMins * 60
+        elapsedSeconds = 0
+        withAnimation(.spring(duration: 0.4)) { timerState = .breakTime }
+        scheduleTimer()
+        HapticEngine.shared.lightImpact()
+    }
+
+    private func completeBreak() {
+        timer?.invalidate()
+        timer = nil
+        withAnimation(.spring(duration: 0.4)) {
             timerState = .idle
             remainingSeconds = selectedMinutes * 60
             elapsedSeconds = 0
-            showComplete = true
         }
         HapticEngine.shared.success()
+    }
+
+    private func skipBreak() {
+        completeBreak()
+    }
+
+    private func pauseBreak() {
+        timer?.invalidate()
+        timer = nil
+        withAnimation(.spring(duration: 0.3)) { timerState = .breakPaused }
+    }
+
+    private func resumeBreak() {
+        withAnimation(.spring(duration: 0.3)) { timerState = .breakTime }
+        scheduleTimer()
     }
 
     private func scheduleTimer() {
@@ -831,9 +1168,15 @@ struct FocusTimerView: View {
             if remainingSeconds > 0 {
                 remainingSeconds -= 1
                 elapsedSeconds += 1
-                foregroundElapsedSeconds += 1 // only foreground ticks count for challenge
+                if timerState == .running {
+                    foregroundElapsedSeconds += 1 // only foreground focus ticks count for challenge
+                }
             } else {
-                completeSession()
+                if timerState == .running {
+                    completeSession()
+                } else if timerState == .breakTime {
+                    completeBreak()
+                }
             }
         }
         // .common mode keeps the timer firing while the user scrolls

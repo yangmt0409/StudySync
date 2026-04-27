@@ -7,7 +7,9 @@ struct TodayOverviewIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let container = SharedModelContainer.create()
+        // See AddCountdownIntent — prefer the main app's container to avoid
+        // the in-process duplicate-container corruption that hit v1.0.
+        let container = AppContainer.shared.container ?? SharedModelContainer.create()
         let context = ModelContext(container)
         let descriptor = FetchDescriptor<CountdownEvent>()
 
@@ -25,10 +27,10 @@ struct TodayOverviewIntent: AppIntent {
         }
 
         let lines = upcoming.map { event in
-            "\(event.emoji) \(event.title)：\(event.primaryCount) \(event.unitLabel)"
+            String(localized: "\(event.emoji) \(event.title)：\(event.primaryCount) \(event.unitLabel)")
         }
-
-        let summary = "你有 \(events.filter { !$0.isExpired }.count) 个进行中的倒计时：\n" + lines.joined(separator: "\n")
-        return .result(dialog: IntentDialog(stringLiteral: summary))
+        let joined = lines.joined(separator: "\n")
+        let count = events.filter { !$0.isExpired }.count
+        return .result(dialog: "你有 \(count) 个进行中的倒计时：\n\(joined)")
     }
 }

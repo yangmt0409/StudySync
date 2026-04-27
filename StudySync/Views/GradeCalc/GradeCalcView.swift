@@ -4,6 +4,7 @@ import SwiftData
 struct GradeCalcView: View {
     @Bindable var viewModel: GradeCalculatorViewModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @Query(filter: #Predicate<GradeCourse> { !$0.isArchived }, sort: \GradeCourse.createdAt, order: .reverse)
     private var activeCourses: [GradeCourse]
@@ -61,7 +62,7 @@ struct GradeCalcView: View {
             .sheet(isPresented: $viewModel.showingAddCourse) {
                 AddGradeCourseView(viewModel: viewModel)
             }
-            .sheet(isPresented: $viewModel.showingPaywall) {
+            .fullScreenCover(isPresented: $viewModel.showingPaywall) {
                 PaywallView()
             }
             .task {
@@ -73,28 +74,15 @@ struct GradeCalcView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: SSSpacing.xl) {
-            Image(systemName: "function")
-                .font(SSFont.displayIcon)
-                .foregroundStyle(.tertiary)
-            Text(L10n.gradeEmptyTitle)
-                .font(SSFont.heading2)
-            Text(L10n.gradeEmptySubtitle)
-                .font(SSFont.secondary)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button {
+        SSEmptyStateView(
+            systemImage: "function",
+            title: L10n.gradeEmptyTitle,
+            subtitle: L10n.gradeEmptySubtitle,
+            iconColor: SSColor.brand,
+            cta: .init(label: L10n.gradeAddCourse, systemImage: nil) {
                 viewModel.tryAddCourse(activeCount: 0)
-            } label: {
-                Text(L10n.gradeAddCourse)
-                    .font(SSFont.bodySemibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SSSpacing.xxl)
-                    .padding(.vertical, SSSpacing.lg)
-                    .background(Capsule().fill(SSColor.brand))
             }
-        }
-        .padding(SSSpacing.xxxl)
+        )
     }
 
     // MARK: - Add Button

@@ -3,6 +3,7 @@ import SwiftUI
 struct ProjectTimelineView: View {
     @Bindable var viewModel: TeamProjectViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     private var color: Color {
         Color(hex: viewModel.currentProject?.colorHex ?? "#5B7FFF")
@@ -34,17 +35,12 @@ struct ProjectTimelineView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
-            Text(L10n.projectNoActivity)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(L10n.projectNoActivityDesc)
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
-        }
+        SSEmptyStateView(
+            systemImage: "clock.arrow.circlepath",
+            title: L10n.projectNoActivity,
+            subtitle: L10n.projectNoActivityDesc
+        )
+        .frame(maxHeight: .infinity)
     }
 
     // MARK: - Timeline Row

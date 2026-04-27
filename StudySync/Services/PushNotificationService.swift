@@ -79,7 +79,7 @@ final class PushNotificationService {
 
         // Switch to Social tab for social-related notifications
         switch type {
-        case .friendRequest, .projectInvite, .dueCreated, .dueCompleted, .memberJoined, .nudgeReceived, .ringNudgeReceived, .ringNudgeDelivered:
+        case .friendRequest, .projectInvite, .dueCreated, .dueCompleted, .memberJoined, .nudgeReceived, .nudgeDelivered, .ringNudgeReceived, .ringNudgeDelivered:
             NotificationCenter.default.post(name: .init("switchToSocialTab"), object: nil)
         default:
             break
@@ -108,6 +108,7 @@ enum PushNotificationType: String, Equatable {
     case deadlineOverdue = "deadline_overdue"
     case memberJoined = "member_joined"
     case nudgeReceived = "nudge_received"
+    case nudgeDelivered = "nudge_delivered"
     case ringNudgeReceived = "ring_nudge_received"
     case ringNudgeDelivered = "ring_nudge_delivered"
     case general

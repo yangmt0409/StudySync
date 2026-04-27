@@ -70,7 +70,7 @@ struct ProjectDueEventCard: View {
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             } else {
-                                Text("\(due.assigneeNames.count)人")
+                                Text(L10n.projectMemberCount(due.assigneeNames.count))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }

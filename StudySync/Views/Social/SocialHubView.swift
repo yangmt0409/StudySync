@@ -7,6 +7,9 @@ struct SocialHubView: View {
     private var notificationManager: InAppNotificationManager { .shared }
     @State private var hasAppeared = false
     @State private var showSignOutConfirm = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
 
     var body: some View {
         NavigationStack {
@@ -21,7 +24,7 @@ struct SocialHubView: View {
 
     private var authenticatedContent: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: SSSpacing.xl) {
                 // Profile card
                 if let profile = auth.userProfile {
                     profileCard(profile)
@@ -107,6 +110,18 @@ struct SocialHubView: View {
                 }
                 .opacity(hasAppeared ? 1 : 0)
                 .offset(y: hasAppeared ? 0 : 10)
+
+                // Delete account (Apple Guideline 5.1.1 compliance)
+                Button {
+                    showDeleteAccountConfirm = true
+                    HapticEngine.shared.warning()
+                } label: {
+                    menuRow(icon: "trash.fill", color: "#B00020",
+                            title: L10n.deleteAccountAction, showChevron: false)
+                }
+                .disabled(isDeletingAccount)
+                .opacity(hasAppeared ? 1 : 0)
+                .offset(y: hasAppeared ? 0 : 10)
             }
             .padding(.horizontal, SSSpacing.xl)
             .padding(.top, SSSpacing.md)
@@ -141,13 +156,56 @@ struct SocialHubView: View {
         } message: {
             Text(L10n.signOutConfirmMessage)
         }
+        .alert(L10n.deleteAccountConfirmTitle, isPresented: $showDeleteAccountConfirm) {
+            Button(L10n.deleteAccountAction, role: .destructive) {
+                performDeleteAccount()
+            }
+            Button(L10n.cancel, role: .cancel) {}
+        } message: {
+            Text(L10n.deleteAccountConfirmMessage)
+        }
+        .alert(L10n.deleteAccountErrorTitle, isPresented: .constant(deleteAccountError != nil)) {
+            Button("OK", role: .cancel) { deleteAccountError = nil }
+        } message: {
+            Text(deleteAccountError ?? "")
+        }
+        .overlay {
+            if isDeletingAccount {
+                ZStack {
+                    Color.black.opacity(SSOpacity.disabled).ignoresSafeArea()
+                    ProgressView {
+                        Text(L10n.deleteAccountInProgress)
+                            .font(SSFont.secondary)
+                    }
+                    .padding(SSSpacing.xxxl)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous))
+                }
+            }
+        }
+    }
+
+    private func performDeleteAccount() {
+        Task {
+            isDeletingAccount = true
+            defer { isDeletingAccount = false }
+            do {
+                try await auth.deleteAccount()
+                HapticEngine.shared.success()
+            } catch let error as AuthService.DeleteAccountError {
+                deleteAccountError = error.errorDescription
+                HapticEngine.shared.error()
+            } catch {
+                deleteAccountError = error.localizedDescription
+                HapticEngine.shared.error()
+            }
+        }
     }
 
     // MARK: - Profile Card
 
     private func profileCard(_ profile: UserProfile) -> some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
+        VStack(spacing: SSSpacing.lg) {
+            HStack(spacing: SSSpacing.lgXl) {
                 NavigationLink {
                     UserProfileDetailView(myUid: profile.id)
                 } label: {
@@ -161,7 +219,7 @@ struct SocialHubView: View {
                 }
                 .simultaneousGesture(TapGesture().onEnded { HapticEngine.shared.selection() })
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     NavigationLink {
                         UserProfileDetailView(myUid: profile.id)
                     } label: {
@@ -215,7 +273,7 @@ struct SocialHubView: View {
             // Showcase badges
             if !profile.showcaseBadges.isEmpty {
                 Divider()
-                HStack(spacing: 16) {
+                HStack(spacing: SSSpacing.xl) {
                     ForEach(profile.showcaseBadges, id: \.self) { badgeId in
                         if let badge = Badge.badge(for: badgeId) {
                             VStack(spacing: 3) {
@@ -224,9 +282,33 @@ struct SocialHubView: View {
                                     .frame(width: 40, height: 40)
                                     .background(
                                         Circle()
-                                            .fill(badge.color.opacity(0.15))
+                                            .fill(badge.color.opacity(SSOpacity.lightTint))
                                     )
                                 Text(badge.name)
+                                    .font(SSFont.micro)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Showcase decorations
+            if !profile.showcaseDecorations.isEmpty {
+                Divider()
+                HStack(spacing: SSSpacing.lg) {
+                    ForEach(profile.showcaseDecorations, id: \.self) { itemId in
+                        if let item = StudySpaceItem.catalog.first(where: { $0.id == itemId }) {
+                            VStack(spacing: 3) {
+                                Text(item.emoji)
+                                    .font(.system(size: 22))
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color(hex: "#F59E0B").opacity(0.1))
+                                    )
+                                Text(item.name)
                                     .font(SSFont.micro)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -275,7 +357,7 @@ struct SocialHubView: View {
     // MARK: - Quick Actions
 
     private var quickActions: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             NavigationLink {
                 AddFriendView()
             } label: {
@@ -291,7 +373,7 @@ struct SocialHubView: View {
     }
 
     private func actionButton(icon: String, label: String, color: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: SSSpacing.md) {
             Image(systemName: icon)
                 .font(.system(size: 22))
                 .foregroundStyle(Color(hex: color))
@@ -310,7 +392,7 @@ struct SocialHubView: View {
     // MARK: - Menu Row
 
     private func menuRow(icon: String, color: String, title: String, showChevron: Bool, badgeCount: Int = 0) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             Image(systemName: icon)
                 .font(.system(size: 18))
                 .foregroundStyle(Color(hex: color))
@@ -325,7 +407,7 @@ struct SocialHubView: View {
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(minWidth: 20, minHeight: 20)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, SSSpacing.xs)
                     .background(Color.red, in: Capsule())
                     .transition(.scale.combined(with: .opacity))
             }
@@ -349,7 +431,7 @@ struct SocialHubView: View {
     // MARK: - Share Toggle
 
     private func shareToggle(_ profile: UserProfile) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             Image(systemName: "shared.with.you")
                 .font(.system(size: 18))
                 .foregroundStyle(Color(hex: "#A8E6CF"))
@@ -380,10 +462,10 @@ struct SocialHubView: View {
     }
 
     private func shareAvailabilityToggle(_ profile: UserProfile) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             Image(systemName: "calendar.badge.clock")
                 .font(.system(size: 18))
-                .foregroundStyle(Color(hex: "#FFB347"))
+                .foregroundStyle(SSColor.life)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -411,7 +493,7 @@ struct SocialHubView: View {
     }
 
     private func allowNudgesToggle(_ profile: UserProfile) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             Image(systemName: "hand.tap")
                 .font(.system(size: 18))
                 .foregroundStyle(SSColor.meetup)

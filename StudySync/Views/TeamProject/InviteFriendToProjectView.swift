@@ -23,18 +23,18 @@ struct InviteFriendToProjectView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if friends.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: SSSpacing.xl) {
                         Image(systemName: "person.2.slash")
                             .font(.system(size: 40))
                             .foregroundStyle(.tertiary)
                         Text(L10n.socialFriends)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(SSFont.bodyMedium)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(friends) { friend in
-                        HStack(spacing: 12) {
+                        HStack(spacing: SSSpacing.lg) {
                             Text(friend.avatarEmoji)
                                 .font(.system(size: 22))
                                 .frame(width: 38, height: 38)
@@ -42,7 +42,7 @@ struct InviteFriendToProjectView: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(friend.displayName)
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(SSFont.bodySmallMedium)
                             }
 
                             Spacer()
@@ -51,7 +51,7 @@ struct InviteFriendToProjectView: View {
                                 Text(L10n.projectMember)
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, SSSpacing.mdLg)
                                     .padding(.vertical, 5)
                                     .background(Capsule().fill(Color(.tertiarySystemFill)))
                             } else if sentInvites.contains(friend.id) {
@@ -64,9 +64,9 @@ struct InviteFriendToProjectView: View {
                                     Text(L10n.projectInviteFriend)
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(.white)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Capsule().fill(Color(hex: "#5B7FFF")))
+                                        .padding(.horizontal, SSSpacing.lg)
+                                        .padding(.vertical, SSSpacing.sm)
+                                        .background(Capsule().fill(SSColor.brand))
                                 }
                                 .buttonStyle(.borderless)
                             }

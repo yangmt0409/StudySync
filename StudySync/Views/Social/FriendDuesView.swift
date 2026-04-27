@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FriendDuesView: View {
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     let friend: FriendInfo
 
     @State private var dues: [SharedDue] = []
@@ -201,15 +202,10 @@ struct FriendDuesView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Spacer().frame(height: 40)
-            Image(systemName: "calendar.badge.checkmark")
-                .font(.system(size: 44))
-                .foregroundStyle(.secondary)
-            Text(L10n.socialNoDues)
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-        }
+        SSEmptyStateView(
+            systemImage: "calendar.badge.checkmark",
+            title: L10n.socialNoDues
+        )
     }
 
     // MARK: - Load

@@ -10,39 +10,39 @@ struct ArchivedProjectsView: View {
                 .ignoresSafeArea()
             Group {
                 if viewModel.archivedProjects.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: SSSpacing.xl) {
                         Image(systemName: "archivebox")
                             .font(.system(size: 40))
                             .foregroundStyle(.tertiary)
                         Text(L10n.projectArchivedProjects)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(SSFont.bodyMedium)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        VStack(spacing: 12) {
+                        VStack(spacing: SSSpacing.lg) {
                             ForEach(viewModel.archivedProjects) { project in
                                 NavigationLink {
                                     ProjectDetailView(project: project, viewModel: viewModel)
                                 } label: {
-                                    HStack(spacing: 14) {
+                                    HStack(spacing: SSSpacing.lgXl) {
                                         Text(project.emoji)
-                                            .font(.system(size: 28))
+                                            .font(SSFont.emojiLarge)
 
-                                        VStack(alignment: .leading, spacing: 2) {
+                                        VStack(alignment: .leading, spacing: SSSpacing.xxs) {
                                             Text(project.name)
-                                                .font(.system(size: 15, weight: .medium))
+                                                .font(SSFont.bodySmallMedium)
                                                 .foregroundStyle(.secondary)
 
-                                            HStack(spacing: 8) {
+                                            HStack(spacing: SSSpacing.md) {
                                                 Text(L10n.projectMemberCount(project.memberCount))
-                                                    .font(.system(size: 12))
+                                                    .font(SSFont.footnote)
                                                     .foregroundStyle(.tertiary)
 
                                                 if let archivedAt = project.archivedAt {
                                                     Text(archivedAt.formattedShort)
-                                                        .font(.system(size: 12))
+                                                        .font(SSFont.footnote)
                                                         .foregroundStyle(.tertiary)
                                                 }
                                             }
@@ -51,26 +51,26 @@ struct ArchivedProjectsView: View {
                                         Spacer()
 
                                         Text(L10n.projectArchived)
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(SSFont.badge)
                                             .foregroundStyle(.orange)
-                                            .padding(.horizontal, 8)
+                                            .padding(.horizontal, SSSpacing.md)
                                             .padding(.vertical, 3)
                                             .background(
                                                 Capsule().fill(Color.orange.opacity(0.1))
                                             )
                                     }
-                                    .padding(14)
+                                    .padding(SSSpacing.lgXl)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                                             .fill(Color(.secondarySystemGroupedBackground))
                                     )
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 20)
+                        .padding(.horizontal, SSSpacing.xl)
+                        .padding(.top, SSSpacing.md)
+                        .padding(.bottom, SSSpacing.xxl)
                     }
                 }
             }

@@ -4,6 +4,7 @@ struct EditProjectDueView: View {
     let due: ProjectDue
     let viewModel: TeamProjectViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @State private var title: String
     @State private var description: String
@@ -37,42 +38,42 @@ struct EditProjectDueView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: SSSpacing.xxl) {
                         // Title
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SSSpacing.md) {
                             Text(L10n.projectDueTitle)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
                             TextField(L10n.projectDueTitle, text: $title)
-                                .font(.system(size: 16))
-                                .padding(14)
+                                .font(SSFont.body)
+                                .padding(SSSpacing.lgXl)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                                         .fill(Color(.secondarySystemGroupedBackground))
                                 )
                         }
 
                         // Description
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SSSpacing.md) {
                             Text(L10n.projectDueDesc)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
                             TextField(L10n.projectDueDesc, text: $description, axis: .vertical)
                                 .font(.system(size: 15))
                                 .lineLimit(3...6)
-                                .padding(14)
+                                .padding(SSSpacing.lgXl)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                                         .fill(Color(.secondarySystemGroupedBackground))
                                 )
                         }
 
                         // Emoji
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SSSpacing.md) {
                             Text(L10n.projectEmoji)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                            LazyVGrid(columns: iPadGridColumns(iPhone: 6, spacing: 6, sizeClass: hSizeClass), spacing: 6) {
                                 ForEach(emojiOptions, id: \.self) { option in
                                     Button {
                                         emoji = option
@@ -81,10 +82,10 @@ struct EditProjectDueView: View {
                                         Text(option)
                                             .font(.system(size: 24))
                                             .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 6)
+                                            .padding(.vertical, SSSpacing.sm)
                                             .background(
                                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                    .fill(emoji == option ? Color(hex: "#5B7FFF").opacity(0.15) : Color.clear)
+                                                    .fill(emoji == option ? SSColor.brand.opacity(SSOpacity.lightTint) : Color.clear)
                                             )
                                     }
                                     .buttonStyle(.plain)
@@ -93,43 +94,43 @@ struct EditProjectDueView: View {
                         }
 
                         // Due date
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SSSpacing.md) {
                             Text(L10n.projectDueDate)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
                             DatePicker("", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
                                 .datePickerStyle(.compact)
                                 .labelsHidden()
-                                .padding(14)
+                                .padding(SSSpacing.lgXl)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                                         .fill(Color(.secondarySystemGroupedBackground))
                                 )
                         }
 
                         // Priority
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SSSpacing.md) {
                             Text(L10n.projectDuePriority)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
-                            HStack(spacing: 10) {
+                            HStack(spacing: SSSpacing.mdLg) {
                                 ForEach(DuePriority.allCases, id: \.self) { p in
                                     Button {
                                         priority = p
                                         HapticEngine.shared.selection()
                                     } label: {
-                                        HStack(spacing: 4) {
+                                        HStack(spacing: SSSpacing.xs) {
                                             Image(systemName: p.icon)
-                                                .font(.system(size: 12))
+                                                .font(SSFont.footnote)
                                             Text(p.displayName)
-                                                .font(.system(size: 14, weight: .medium))
+                                                .font(SSFont.chipLabel)
                                         }
                                         .foregroundStyle(priority == p ? .white : Color(hex: p.colorHex))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, SSSpacing.lgXl)
+                                        .padding(.vertical, SSSpacing.md)
                                         .background(
                                             Capsule().fill(
-                                                priority == p ? Color(hex: p.colorHex) : Color(hex: p.colorHex).opacity(0.12)
+                                                priority == p ? Color(hex: p.colorHex) : Color(hex: p.colorHex).opacity(SSOpacity.tagBackground)
                                             )
                                         )
                                     }
@@ -139,12 +140,12 @@ struct EditProjectDueView: View {
 
                         // Assign (only if >=2 members)
                         if canAssign, let members = viewModel.currentProject?.memberProfiles {
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: SSSpacing.md) {
                                 Text(L10n.projectDueAssign)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(SSFont.chipLabel)
                                     .foregroundStyle(.secondary)
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 10) {
+                                    HStack(spacing: SSSpacing.mdLg) {
                                         ForEach(members) { member in
                                             let selected = assignedMembers.contains(member.id)
                                             Button {
@@ -155,7 +156,7 @@ struct EditProjectDueView: View {
                                                 }
                                                 HapticEngine.shared.selection()
                                             } label: {
-                                                VStack(spacing: 4) {
+                                                VStack(spacing: SSSpacing.xs) {
                                                     ZStack(alignment: .bottomTrailing) {
                                                         Text(member.avatarEmoji)
                                                             .font(.system(size: 24))
@@ -164,24 +165,24 @@ struct EditProjectDueView: View {
                                                         if selected {
                                                             Image(systemName: "checkmark.circle.fill")
                                                                 .font(.system(size: 14))
-                                                                .foregroundStyle(.white, Color(hex: "#5B7FFF"))
+                                                                .foregroundStyle(.white, SSColor.brand)
                                                                 .offset(x: 4, y: 4)
                                                         }
                                                     }
                                                     Text(member.displayName)
-                                                        .font(.system(size: 10))
+                                                        .font(SSFont.micro)
                                                         .foregroundStyle(.primary)
                                                         .lineLimit(1)
                                                 }
                                                 .frame(width: 60)
-                                                .padding(.vertical, 8)
+                                                .padding(.vertical, SSSpacing.md)
                                                 .background(
-                                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                        .fill(selected ? Color(hex: "#5B7FFF").opacity(0.1) : Color.clear)
+                                                    RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
+                                                        .fill(selected ? SSColor.brand.opacity(0.1) : Color.clear)
                                                 )
                                                 .overlay(
-                                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                        .stroke(selected ? Color(hex: "#5B7FFF") : Color.clear, lineWidth: 1.5)
+                                                    RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
+                                                        .stroke(selected ? SSColor.brand : Color.clear, lineWidth: 1.5)
                                                 )
                                             }
                                             .buttonStyle(.plain)
@@ -191,9 +192,9 @@ struct EditProjectDueView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, SSSpacing.xxl)
+                    .padding(.top, SSSpacing.md)
+                    .padding(.bottom, SSSpacing.xxl)
                 }
             }
             .scrollDismissesKeyboard(.interactively)

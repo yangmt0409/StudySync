@@ -61,10 +61,21 @@ final class DeepLinkRouter {
             pendingDestination = .aiMonitor
         case "grades", "gradecalc":
             pendingDestination = .gradeCalc
+        case "travel":
+            // studysync://travel?flight=CA981&date=2026-04-25
+            // Parsed payload becomes a "pending intake" which AddTravelView
+            // can pick up. For now, just route to Schedule tab and surface
+            // add-travel sheet.
+            pendingDestination = .schedule
+            pendingTravelIntake = ShareIntakeService.parseTravelURL(url)
         default:
             break
         }
     }
+
+    /// Pending travel intake from a deep-link. View layer consumes this to
+    /// prefill the AddTravelView with a detected designator.
+    var pendingTravelIntake: ShareIntakeService.IntakeResult?
 
     /// Route a local notification tap. Called from `AppDelegate` before the
     /// payload is forwarded to `PushNotificationService` (which handles

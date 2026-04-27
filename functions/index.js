@@ -284,6 +284,126 @@ exports.scheduledDeadlineReminder = onSchedule(
 );
 
 // ============================================================
+// 7. Nudge (拍一拍) → Notify receiver + confirm to sender
+// ============================================================
+exports.onNudgeSent = onDocumentCreated(
+  "users/{receiverUid}/nudges/{nudgeId}",
+  async (event) => {
+    const nudge = event.data.data();
+    const receiverUid = event.params.receiverUid;
+    const senderUid = nudge.fromUid;
+    const senderName = nudge.fromName || "Someone";
+    const senderEmoji = nudge.fromEmoji || "👋";
+
+    // 1) Send nudge notification to receiver
+    const receiverTokens = await getFCMTokens([receiverUid]);
+    if (receiverTokens.length > 0) {
+      const receiverMessage = {
+        notification: {
+          title: "拍一拍 👋",
+          body: `${senderEmoji} ${senderName} 拍了拍你`,
+        },
+        data: {
+          type: "nudge_received",
+        },
+      };
+      const result = await sendToTokens(receiverTokens, receiverMessage);
+
+      // 2) If successfully delivered, confirm to sender
+      if (result > 0) {
+        const receiverDoc = await db.collection("users").doc(receiverUid).get();
+        const receiverName = receiverDoc.exists
+          ? receiverDoc.data().displayName || "对方"
+          : "对方";
+        const receiverEmoji = receiverDoc.exists
+          ? receiverDoc.data().avatarEmoji || ""
+          : "";
+
+        const senderTokens = await getFCMTokens([senderUid]);
+        if (senderTokens.length > 0) {
+          const confirmMessage = {
+            notification: {
+              title: "拍一拍已送达 ✅",
+              body: `${receiverEmoji} ${receiverName} 已收到你的拍一拍`,
+            },
+            data: {
+              type: "nudge_delivered",
+            },
+          };
+          await sendToTokens(senderTokens, confirmMessage);
+        }
+      }
+    }
+
+    console.log(`[Nudge] ${senderName} → ${receiverUid.substring(0, 8)}...`);
+  }
+);
+
+// ============================================================
+// 8. Ring Nudge (响铃拍一拍) → Critical push to receiver + confirm to sender
+// ============================================================
+exports.onRingNudgeSent = onDocumentCreated(
+  "users/{receiverUid}/ringNudges/{nudgeId}",
+  async (event) => {
+    const nudge = event.data.data();
+    const receiverUid = event.params.receiverUid;
+    const senderUid = nudge.fromUid;
+    const senderName = nudge.fromName || "Someone";
+    const senderEmoji = nudge.fromEmoji || "🔔";
+
+    // 1) Send critical notification to receiver (rings the phone)
+    const receiverTokens = await getFCMTokens([receiverUid]);
+    if (receiverTokens.length > 0) {
+      const receiverMessage = {
+        notification: {
+          title: "响铃拍一拍 🔔",
+          body: `${senderEmoji} ${senderName} 响铃拍了拍你！`,
+        },
+        data: {
+          type: "ring_nudge_received",
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: {
+                critical: true,
+                name: "default",
+                volume: 1.0,
+              },
+            },
+          },
+        },
+      };
+      const result = await sendToTokens(receiverTokens, receiverMessage);
+
+      // 2) If successfully delivered, confirm to sender
+      if (result > 0) {
+        const receiverDoc = await db.collection("users").doc(receiverUid).get();
+        const receiverName = receiverDoc.exists
+          ? receiverDoc.data().displayName || "对方"
+          : "对方";
+
+        const senderTokens = await getFCMTokens([senderUid]);
+        if (senderTokens.length > 0) {
+          const confirmMessage = {
+            notification: {
+              title: "响铃已送达 🔔",
+              body: `${receiverName} 的手机已响铃`,
+            },
+            data: {
+              type: "ring_nudge_delivered",
+            },
+          };
+          await sendToTokens(senderTokens, confirmMessage);
+        }
+      }
+    }
+
+    console.log(`[RingNudge] ${senderName} → ${receiverUid.substring(0, 8)}...`);
+  }
+);
+
+// ============================================================
 // Helper: Get FCM tokens for UIDs
 // ============================================================
 async function getFCMTokens(uids) {
@@ -310,7 +430,7 @@ async function getFCMTokens(uids) {
 // Helper: Send FCM to multiple tokens (handles invalid tokens)
 // ============================================================
 async function sendToTokens(tokens, messageTemplate) {
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) return 0;
 
   const messages = tokens.map((token) => ({
     ...messageTemplate,
@@ -337,8 +457,10 @@ async function sendToTokens(tokens, messageTemplate) {
 
     const successCount = response.responses.filter((r) => r.success).length;
     console.log(`[FCM] Sent ${successCount}/${tokens.length} messages`);
+    return successCount;
   } catch (error) {
     console.error("[FCM] sendEach error:", error);
+    return 0;
   }
 }
 

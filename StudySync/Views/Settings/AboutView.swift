@@ -23,12 +23,30 @@ struct AboutView: View {
 
                     // Acknowledgements
                     infoSection(title: L10n.acknowledgements) {
-                        personRow(name: "Yixuan Wei", emoji: "🌟")
+                        personRow(name: "Yixuan Wei", emoji: "🧑🏻‍💼")
+                        personRow(name: "Chuxiang Jin", emoji: "🎻")
                     }
 
                     // Open Source
                     infoSection(title: L10n.openSource) {
                         libraryRow(name: "Firebase", desc: "Google")
+                    }
+
+                    // Legal — Privacy Policy + Terms of Use links live here
+                    // so the App Store reviewer can find them outside the
+                    // paywall (Guideline 5.1.1 wants them reachable from
+                    // anywhere in the app, not only the purchase flow).
+                    infoSection(title: L10n.legalSection) {
+                        legalLinkRow(
+                            title: L10n.privacyPolicy,
+                            symbol: "hand.raised.fill",
+                            url: AppLegalURL.privacyPolicy
+                        )
+                        legalLinkRow(
+                            title: L10n.termsOfUse,
+                            symbol: "doc.text.fill",
+                            url: AppLegalURL.termsOfUse
+                        )
                     }
 
                     // Footer
@@ -46,6 +64,7 @@ struct AboutView: View {
                 }
                 .padding(.horizontal, SSSpacing.xl)
                 .padding(.top, SSSpacing.xl)
+                .readableContentWidth()
             }
         }
         .navigationTitle(L10n.about)
@@ -138,6 +157,35 @@ struct AboutView: View {
         }
         .padding(.horizontal, SSSpacing.xl)
         .padding(.vertical, SSSpacing.lg)
+    }
+
+    // MARK: - Legal Link Row
+
+    /// Row that opens an external URL in the system browser. Used for
+    /// Privacy Policy / Terms of Use links — Apple requires these be
+    /// reachable from a non-paywall context too.
+    private func legalLinkRow(title: String, symbol: String, url: URL) -> some View {
+        Link(destination: url) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SSColor.brand)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(SSColor.brand.opacity(0.12)))
+
+                Text(title)
+                    .font(SSFont.bodyMedium)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, SSSpacing.xl)
+            .padding(.vertical, SSSpacing.lg)
+        }
     }
 
     // MARK: - Library Row

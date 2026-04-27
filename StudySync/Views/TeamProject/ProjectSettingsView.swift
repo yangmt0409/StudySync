@@ -20,7 +20,7 @@ struct ProjectSettingsView: View {
             Color(.systemGroupedBackground)
                 .ignoresSafeArea()
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: SSSpacing.xl) {
                     if let project {
                         // Project code
                         codeSection(project)
@@ -40,9 +40,9 @@ struct ProjectSettingsView: View {
                         actionsSection(project)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+                .padding(.horizontal, SSSpacing.xl)
+                .padding(.top, SSSpacing.md)
+                .padding(.bottom, SSSpacing.xxl)
             }
         }
         .navigationTitle(L10n.projectSettings)
@@ -85,9 +85,9 @@ struct ProjectSettingsView: View {
     // MARK: - Code Section
 
     private func codeSection(_ project: TeamProject) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SSSpacing.lg) {
             Text(L10n.projectCode)
-                .font(.system(size: 13))
+                .font(SSFont.caption)
                 .foregroundStyle(.secondary)
 
             Text(project.projectCode)
@@ -101,9 +101,9 @@ struct ProjectSettingsView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 140, height: 140)
-                    .padding(8)
+                    .padding(SSSpacing.md)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                             .fill(Color.white)
                     )
             }
@@ -116,24 +116,24 @@ struct ProjectSettingsView: View {
                     withAnimation { codeCopied = false }
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: SSSpacing.sm) {
                     Image(systemName: codeCopied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                     Text(codeCopied ? L10n.projectCodeCopied : L10n.projectCopyCode)
                         .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundStyle(codeCopied ? .green : Color(hex: "#5B7FFF"))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .foregroundStyle(codeCopied ? .green : SSColor.brand)
+                .padding(.horizontal, SSSpacing.xl)
+                .padding(.vertical, SSSpacing.md)
                 .background(
-                    Capsule().fill(Color(hex: "#5B7FFF").opacity(0.1))
+                    Capsule().fill(SSColor.brand.opacity(0.1))
                 )
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(20)
+        .padding(SSSpacing.xxl)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }
@@ -141,19 +141,19 @@ struct ProjectSettingsView: View {
     // MARK: - Members
 
     private func membersSection(_ project: TeamProject) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SSSpacing.lg) {
             HStack {
                 Text(L10n.projectMembers)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(SSFont.bodySemibold)
                 Spacer()
                 Text(L10n.projectMemberCount(project.memberCount))
-                    .font(.system(size: 13))
+                    .font(SSFont.caption)
                     .foregroundStyle(.secondary)
             }
 
             VStack(spacing: 0) {
                 ForEach(Array(project.memberProfiles.enumerated()), id: \.element.id) { index, member in
-                    HStack(spacing: 12) {
+                    HStack(spacing: SSSpacing.lg) {
                         Text(member.avatarEmoji)
                             .font(.system(size: 22))
                             .frame(width: 38, height: 38)
@@ -161,9 +161,9 @@ struct ProjectSettingsView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(member.displayName)
-                                .font(.system(size: 15, weight: .medium))
+                                .font(SSFont.bodySmallMedium)
                             Text(member.role == .owner ? L10n.projectOwner : L10n.projectMember)
-                                .font(.system(size: 12))
+                                .font(SSFont.footnote)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -175,8 +175,8 @@ struct ProjectSettingsView: View {
                                 .foregroundStyle(.orange)
                         }
                     }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 16)
+                    .padding(.vertical, SSSpacing.mdLg)
+                    .padding(.horizontal, SSSpacing.xl)
 
                     if index < project.memberProfiles.count - 1 {
                         Divider().padding(.leading, 66)
@@ -184,7 +184,7 @@ struct ProjectSettingsView: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                     .fill(Color(.secondarySystemGroupedBackground))
             )
         }
@@ -193,7 +193,7 @@ struct ProjectSettingsView: View {
     // MARK: - Actions
 
     private func actionsSection(_ project: TeamProject) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: SSSpacing.mdLg) {
             // Archive (owner only)
             if isOwner {
                 Button {
@@ -203,12 +203,12 @@ struct ProjectSettingsView: View {
                         Image(systemName: "archivebox")
                         Text(L10n.projectArchive)
                     }
-                    .font(.system(size: 15, weight: .medium))
+                    .font(SSFont.bodySmallMedium)
                     .foregroundStyle(.orange)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, SSSpacing.lg)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                             .fill(Color.orange.opacity(0.1))
                     )
                 }
@@ -223,12 +223,12 @@ struct ProjectSettingsView: View {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                         Text(L10n.projectLeave)
                     }
-                    .font(.system(size: 15, weight: .medium))
+                    .font(SSFont.bodySmallMedium)
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, SSSpacing.lg)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                             .fill(Color.red.opacity(0.1))
                     )
                 }
@@ -243,12 +243,12 @@ struct ProjectSettingsView: View {
                         Image(systemName: "trash")
                         Text(L10n.projectDelete)
                     }
-                    .font(.system(size: 15, weight: .medium))
+                    .font(SSFont.bodySmallMedium)
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, SSSpacing.lg)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: SSRadius.fieldCard, style: .continuous)
                             .fill(Color.red.opacity(0.1))
                     )
                 }
@@ -259,14 +259,14 @@ struct ProjectSettingsView: View {
     // MARK: - Menu Row
 
     private func menuRow(icon: String, color: String, title: String, showChevron: Bool) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             Image(systemName: icon)
                 .font(.system(size: 18))
                 .foregroundStyle(Color(hex: color))
                 .frame(width: 28)
 
             Text(title)
-                .font(.system(size: 16, weight: .medium))
+                .font(SSFont.bodyMedium)
                 .foregroundStyle(.primary)
 
             Spacer()
@@ -277,9 +277,9 @@ struct ProjectSettingsView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }

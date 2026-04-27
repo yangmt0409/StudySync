@@ -17,7 +17,7 @@ struct ProjectDetailView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: SSSpacing.xl) {
                     // Header
                     headerSection
                         .opacity(hasAppeared ? 1 : 0)
@@ -65,7 +65,7 @@ struct ProjectDetailView: View {
 
                     // #5 Error message
                     if let error = viewModel.errorMessage {
-                        HStack(spacing: 8) {
+                        HStack(spacing: SSSpacing.md) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                             Text(error)
@@ -81,12 +81,12 @@ struct ProjectDetailView: View {
                             }
                         }
                         .padding(SSSpacing.lg)
-                        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        .background(.orange.opacity(SSOpacity.shadow), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+                .padding(.horizontal, SSSpacing.xl)
+                .padding(.top, SSSpacing.md)
+                .padding(.bottom, SSSpacing.xxl)
                 .animation(.spring(duration: 0.5), value: hasAppeared)
             }
             // #1 Pull-to-refresh
@@ -99,7 +99,7 @@ struct ProjectDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
+                HStack(spacing: SSSpacing.lg) {
                     Button {
                         viewModel.showingAddDue = true
                         HapticEngine.shared.lightImpact()
@@ -159,7 +159,7 @@ struct ProjectDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SSSpacing.lg) {
             Text(currentProject.emoji)
                 .font(.system(size: 42))
 
@@ -180,17 +180,17 @@ struct ProjectDetailView: View {
             }
 
             Text(L10n.projectMemberCount(currentProject.memberCount))
-                .font(.system(size: 13))
+                .font(SSFont.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, SSSpacing.xl)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(color.opacity(colorScheme == .dark ? 0.08 : 0.05))
+            RoundedRectangle(cornerRadius: SSRadius.large, style: .continuous)
+                .fill(color.opacity(colorScheme == .dark ? SSOpacity.shadow : 0.05))
         )
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.large, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }
@@ -198,13 +198,13 @@ struct ProjectDetailView: View {
     // MARK: - Invite Banner
 
     private var inviteBanner: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SSSpacing.mdLg) {
             Image(systemName: "person.badge.plus")
                 .font(.system(size: 18))
                 .foregroundStyle(Color(hex: "#FFD93D"))
 
             Text(L10n.projectInviteBanner)
-                .font(.system(size: 13))
+                .font(SSFont.caption)
                 .foregroundStyle(.primary)
 
             Spacer()
@@ -215,14 +215,14 @@ struct ProjectDetailView: View {
                 Text(L10n.projectInviteFriend)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color(hex: "#5B7FFF")))
+                    .padding(.horizontal, SSSpacing.lg)
+                    .padding(.vertical, SSSpacing.sm)
+                    .background(Capsule().fill(SSColor.brand))
             }
         }
-        .padding(14)
+        .padding(SSSpacing.lgXl)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .fill(Color(hex: "#FFD93D").opacity(0.1))
         )
     }
@@ -230,7 +230,7 @@ struct ProjectDetailView: View {
     // MARK: - Stats
 
     private var statsRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             statBadge(
                 icon: "checkmark.circle.fill",
                 value: L10n.projectDueStats(viewModel.completedDueCount, viewModel.totalDueCount),
@@ -248,16 +248,16 @@ struct ProjectDetailView: View {
     }
 
     private func statBadge(icon: String, value: String, iconColor: Color) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: SSSpacing.sm) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(SSFont.caption)
                 .foregroundStyle(iconColor)
             Text(value)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, SSSpacing.lg)
+        .padding(.vertical, SSSpacing.md)
         .background(
             Capsule().fill(Color(.secondarySystemGroupedBackground))
         )
@@ -316,11 +316,11 @@ struct ProjectDetailView: View {
             HStack(spacing: SSSpacing.lg) {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 22))
-                    .foregroundStyle(Color(hex: "#FFB347"))
+                    .foregroundStyle(SSColor.life)
                     .frame(width: 36, height: 36)
                     .background(
                         Circle()
-                            .fill(Color(hex: "#FFB347").opacity(0.12))
+                            .fill(SSColor.life.opacity(SSOpacity.tagBackground))
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -402,7 +402,7 @@ struct ProjectDetailView: View {
             // Header: LIVE badge + platform + duration
             HStack(spacing: SSSpacing.md) {
                 // Live indicator
-                HStack(spacing: 4) {
+                HStack(spacing: SSSpacing.xs) {
                     Circle()
                         .fill(.red)
                         .frame(width: 6, height: 6)
@@ -414,12 +414,12 @@ struct ProjectDetailView: View {
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundStyle(.red)
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, SSSpacing.sm)
                 .padding(.vertical, 3)
                 .background(Capsule().fill(.red.opacity(0.1)))
 
                 Image(systemName: meeting.platform.icon)
-                    .font(.system(size: 14))
+                    .font(SSFont.secondary)
                     .foregroundStyle(Color(hex: meeting.platform.colorHex))
 
                 Text(meeting.platform.displayName)
@@ -437,7 +437,7 @@ struct ProjectDetailView: View {
             // Creator info
             HStack(spacing: SSSpacing.md) {
                 Text(meeting.creatorEmoji)
-                    .font(.system(size: 16))
+                    .font(SSFont.body)
                 Text(L10n.meetingStartedBy(meeting.creatorName))
                     .font(SSFont.caption)
                     .foregroundStyle(.secondary)
@@ -453,15 +453,15 @@ struct ProjectDetailView: View {
                     }
                     HapticEngine.shared.lightImpact()
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: SSSpacing.sm) {
                         Image(systemName: "video.fill")
-                            .font(.system(size: 14))
+                            .font(SSFont.secondary)
                         Text(L10n.meetingJoin)
                             .font(SSFont.chipLabel)
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, SSSpacing.mdLg)
                     .background(
                         RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                             .fill(Color(hex: meeting.platform.colorHex))
@@ -474,15 +474,15 @@ struct ProjectDetailView: View {
                     Button {
                         viewModel.showingEndMeeting = true
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: SSSpacing.sm) {
                             Image(systemName: "phone.down.fill")
-                                .font(.system(size: 14))
+                                .font(SSFont.secondary)
                             Text(L10n.meetingEnd)
                                 .font(SSFont.chipLabel)
                         }
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, SSSpacing.mdLg)
                         .background(
                             RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                                 .fill(.red.opacity(0.1))
@@ -498,7 +498,7 @@ struct ProjectDetailView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
-                .stroke(Color(hex: meeting.platform.colorHex).opacity(0.3), lineWidth: 1)
+                .stroke(Color(hex: meeting.platform.colorHex).opacity(SSOpacity.elevatedShadow), lineWidth: 1)
         )
     }
 
@@ -558,7 +558,7 @@ struct ProjectDetailView: View {
         VStack(spacing: SSSpacing.lg) {
             // Header
             HStack(spacing: SSSpacing.md) {
-                HStack(spacing: 4) {
+                HStack(spacing: SSSpacing.xs) {
                     Circle()
                         .fill(SSColor.meetup)
                         .frame(width: 6, height: 6)
@@ -570,7 +570,7 @@ struct ProjectDetailView: View {
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundStyle(SSColor.meetup)
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, SSSpacing.sm)
                 .padding(.vertical, 3)
                 .background(Capsule().fill(SSColor.meetup.opacity(SSOpacity.border)))
 
@@ -599,7 +599,7 @@ struct ProjectDetailView: View {
             // Attendee count
             HStack(spacing: SSSpacing.md) {
                 Text(meetup.creatorEmoji)
-                    .font(.system(size: 14))
+                    .font(SSFont.secondary)
                 Text(L10n.meetupAttendees(meetup.attendeeIds.count))
                     .font(SSFont.caption)
                     .foregroundStyle(.secondary)
@@ -611,15 +611,15 @@ struct ProjectDetailView: View {
                 NavigationLink {
                     MeetupDetailView(meetup: meetup, viewModel: viewModel)
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: SSSpacing.sm) {
                         Image(systemName: "map.fill")
-                            .font(.system(size: 14))
+                            .font(SSFont.secondary)
                         Text(L10n.meetupViewDetails)
                             .font(SSFont.chipLabel)
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, SSSpacing.mdLg)
                     .background(
                         RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                             .fill(SSColor.meetup)
@@ -632,15 +632,15 @@ struct ProjectDetailView: View {
                         Button {
                             viewModel.showingEndMeetup = true
                         } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: SSSpacing.sm) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 14))
+                                    .font(SSFont.secondary)
                                 Text(L10n.meetupEnd)
                                     .font(SSFont.chipLabel)
                             }
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, SSSpacing.mdLg)
                             .background(
                                 RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                                     .fill(.red.opacity(0.1))
@@ -653,9 +653,9 @@ struct ProjectDetailView: View {
                             Task { await viewModel.voteCancelMeetup() }
                             HapticEngine.shared.lightImpact()
                         } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: SSSpacing.sm) {
                                 Image(systemName: hasVoted ? "checkmark.circle.fill" : "hand.raised.fill")
-                                    .font(.system(size: 14))
+                                    .font(SSFont.secondary)
                                 Text(hasVoted ? L10n.meetupCancelVoted : L10n.meetupCancelVote)
                                     .font(SSFont.chipLabel)
                                 Text("\(meetup.cancelVotes.count)/\(meetup.cancelVotesNeeded)")
@@ -663,7 +663,7 @@ struct ProjectDetailView: View {
                             }
                             .foregroundStyle(hasVoted ? Color.secondary : Color.red)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, SSSpacing.mdLg)
                             .background(
                                 RoundedRectangle(cornerRadius: SSRadius.small, style: .continuous)
                                     .fill(hasVoted ? Color(.tertiarySystemFill) : .red.opacity(0.1))
@@ -688,7 +688,7 @@ struct ProjectDetailView: View {
     // MARK: - Filter
 
     private var filterPicker: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SSSpacing.md) {
             ForEach(TeamProjectViewModel.DueFilter.allCases, id: \.self) { filter in
                 Button {
                     withAnimation(.spring(duration: 0.2)) {
@@ -699,7 +699,7 @@ struct ProjectDetailView: View {
                     Text(filter.displayName)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(viewModel.dueFilter == filter ? .white : .primary)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, SSSpacing.lgXl)
                         .padding(.vertical, 7)
                         .background(
                             Capsule().fill(viewModel.dueFilter == filter ? color : Color(.tertiarySystemFill))
@@ -713,17 +713,17 @@ struct ProjectDetailView: View {
     // MARK: - Dues
 
     private var duesSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: SSSpacing.mdLg) {
             if viewModel.filteredDues.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: SSSpacing.lg) {
                     Image(systemName: "tray")
                         .font(.system(size: 32))
                         .foregroundStyle(.tertiary)
                     Text(L10n.projectNoDues)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(SSFont.bodySmallMedium)
                         .foregroundStyle(.secondary)
                     Text(L10n.projectNoDuesDesc)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity)

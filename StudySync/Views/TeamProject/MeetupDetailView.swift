@@ -78,8 +78,11 @@ struct MeetupDetailView: View {
             ))
             startTrackingIfJoined()
         }
-        .onDisappear {
-            locationService.stopTracking()
+        .onChange(of: locationService.authorizationStatus) { _, newStatus in
+            // When permission is granted after being requested, start tracking
+            if newStatus == .authorizedWhenInUse || newStatus == .authorizedAlways {
+                startTrackingIfJoined()
+            }
         }
     }
 
@@ -406,18 +409,31 @@ struct MeetupDetailView: View {
     private func startTrackingIfJoined() {
         guard viewModel.isInMeetup else { return }
         let service = MeetupLocationService.shared
-        if !service.hasPermission {
+
+        // Already tracking — just update destination in case it changed
+        if service.isTracking {
+            service.updateDestination(meetupCoord)
+            return
+        }
+
+        if service.hasPermission {
+            beginTracking(service)
+        } else {
+            // Request permission; onChange(of: authorizationStatus) will
+            // call startTrackingIfJoined() again once the user responds.
             service.requestPermission()
         }
-        if service.hasPermission, let projectId = viewModel.currentProject?.id {
-            service.startTracking(
-                projectId: projectId,
-                destination: meetupCoord,
-                meetupTime: meetup.meetupTime,
-                meetupTitle: meetup.title,
-                placeName: meetup.placeName
-            )
-        }
+    }
+
+    private func beginTracking(_ service: MeetupLocationService) {
+        guard let projectId = viewModel.currentProject?.id else { return }
+        service.startTracking(
+            projectId: projectId,
+            destination: meetupCoord,
+            meetupTime: meetup.meetupTime,
+            meetupTitle: meetup.title,
+            placeName: meetup.placeName
+        )
     }
 
     private func openInMaps() {

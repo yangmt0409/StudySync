@@ -175,7 +175,7 @@ struct LargeWidgetView: View {
                 settings.homeTimeZone.secondsFromGMT(for: entry.date)
                 - settings.studyTimeZone.secondsFromGMT(for: entry.date)
             ) / 3600
-            Text("时差\(diffHours)h")
+            Text("时差 \(diffHours)h")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.tertiary)
 

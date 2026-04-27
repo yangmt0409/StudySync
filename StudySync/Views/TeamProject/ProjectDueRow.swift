@@ -176,7 +176,7 @@ struct ProjectDueRow: View {
                             .lineLimit(1)
                             .frame(width: 40)
                     } else {
-                        Text("\(due.assigneeNames.count)人")
+                        Text(L10n.projectMemberCount(due.assigneeNames.count))
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }

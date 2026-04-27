@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BadgeGridView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     private var auth: AuthService { .shared }
 
     private var earnedIds: [String] {
@@ -10,7 +11,7 @@ struct BadgeGridView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: SSSpacing.xxl) {
                 // Summary
                 summaryCard
 
@@ -19,9 +20,9 @@ struct BadgeGridView: View {
                     badgeSection(category)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
+            .padding(.horizontal, SSSpacing.xl)
+            .padding(.top, SSSpacing.md)
+            .padding(.bottom, SSSpacing.xxl)
         }
         .background {
             Color(.systemGroupedBackground)
@@ -34,12 +35,12 @@ struct BadgeGridView: View {
 
     private var summaryCard: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: SSSpacing.xs) {
                 Text("\(earnedIds.count) / \(Badge.all.count)")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(hex: "#5B7FFF"))
+                    .foregroundStyle(SSColor.brand)
                 Text(L10n.socialBadgesEarned)
-                    .font(.system(size: 13))
+                    .font(SSFont.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -52,14 +53,14 @@ struct BadgeGridView: View {
                         .font(.system(size: 24))
                         .frame(width: 36, height: 36)
                         .background(
-                            Circle().fill(badge.color.opacity(0.15))
+                            Circle().fill(badge.color.opacity(SSOpacity.lightTint))
                         )
                 }
             }
         }
-        .padding(16)
+        .padding(SSSpacing.xl)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.card, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
     }
@@ -69,15 +70,11 @@ struct BadgeGridView: View {
     private func badgeSection(_ category: BadgeCategory) -> some View {
         let badges = Badge.all.filter { $0.category == category }
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: SSSpacing.mdLg) {
             Text(category.displayName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(SSFont.bodySemibold)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
+            LazyVGrid(columns: iPadGridColumns(iPhone: 3, scale: 1.7, spacing: SSSpacing.lg, sizeClass: hSizeClass), spacing: SSSpacing.lg) {
                 ForEach(badges) { badge in
                     badgeCell(badge, earned: earnedIds.contains(badge.id))
                 }
@@ -86,7 +83,7 @@ struct BadgeGridView: View {
     }
 
     private func badgeCell(_ badge: Badge, earned: Bool) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: SSSpacing.sm) {
             Text(badge.emoji)
                 .font(.system(size: 32))
                 .grayscale(earned ? 0 : 1)
@@ -95,7 +92,7 @@ struct BadgeGridView: View {
                 .background(
                     Circle()
                         .fill(earned
-                              ? badge.color.opacity(0.15)
+                              ? badge.color.opacity(SSOpacity.lightTint)
                               : Color(.tertiarySystemFill))
                 )
                 .overlay(
@@ -104,7 +101,7 @@ struct BadgeGridView: View {
                 )
 
             Text(badge.name)
-                .font(.system(size: 11, weight: .medium))
+                .font(SSFont.badge)
                 .foregroundStyle(earned ? .primary : .secondary)
                 .lineLimit(1)
 
@@ -115,7 +112,7 @@ struct BadgeGridView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, SSSpacing.md)
     }
 }
 

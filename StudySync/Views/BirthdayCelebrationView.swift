@@ -15,7 +15,7 @@ struct BirthdayCelebrationView: View {
 
     private let birthdayColors: [Color] = [
         .pink, .orange, .yellow, .green, .cyan, .blue, .purple,
-        Color(hex: "#FF6B9D"), Color(hex: "#FFD93D"), Color(hex: "#4ECDC4")
+        SSColor.meetup, Color(hex: "#FFD93D"), SSColor.travel
     ]
 
     var body: some View {
@@ -48,42 +48,42 @@ struct BirthdayCelebrationView: View {
 
                 // Center content
                 if showContent {
-                    VStack(spacing: 20) {
+                    VStack(spacing: SSSpacing.xxl) {
                         // Cake emoji with glow
                         Text("🎂")
                             .font(.system(size: 80))
                             .scaleEffect(cakeScale)
                             .shadow(color: .orange.opacity(glowOpacity), radius: 30)
 
-                        VStack(spacing: 8) {
+                        VStack(spacing: SSSpacing.md) {
                             Text(L10n.birthdayGreeting(name: displayName))
                                 .font(.system(size: 26, weight: .bold))
                                 .foregroundStyle(.white)
                                 .multilineTextAlignment(.center)
 
                             Text(L10n.birthdayWish)
-                                .font(.system(size: 16, weight: .medium))
+                                .font(SSFont.bodyMedium)
                                 .foregroundStyle(.white.opacity(0.85))
                                 .multilineTextAlignment(.center)
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, SSSpacing.xxxl)
 
                         // Decorative emoji row
-                        HStack(spacing: 12) {
+                        HStack(spacing: SSSpacing.lg) {
                             Text("🎉").font(.title)
                             Text("🎈").font(.title)
                             Text("🎁").font(.title)
                             Text("🥳").font(.title)
                             Text("🎊").font(.title)
                         }
-                        .padding(.top, 4)
+                        .padding(.top, SSSpacing.xs)
                     }
                     .padding(32)
                     .background(
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .fill(.ultraThinMaterial)
                     )
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, SSSpacing.xxxl)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
             }

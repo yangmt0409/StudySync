@@ -3,7 +3,24 @@ import SwiftData
 
 struct AIMonitorView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Query(sort: \AIAccount.createdAt) private var accounts: [AIAccount]
+
+    /// Accounts visible in the current storefront (hides ChatGPT in CN per Apple review).
+    private var visibleAccounts: [AIAccount] {
+        accounts.filter { AIProvider.availableCases.contains($0.provider) }
+    }
+
+    /// Accounts sorted by urgency: unauthenticated first, then by peak utilization (highest first)
+    private var sortedAccounts: [AIAccount] {
+        visibleAccounts.sorted { a, b in
+            // Unauthenticated accounts bubble to top
+            if !a.isAuthenticated && b.isAuthenticated { return true }
+            if a.isAuthenticated && !b.isAuthenticated { return false }
+            // Then sort by peak utilization descending
+            return a.peakUtilization > b.peakUtilization
+        }
+    }
 
     @State private var showAddAccount = false
     @State private var selectedAccount: AIAccount?
@@ -17,7 +34,7 @@ struct AIMonitorView: View {
                 SSColor.backgroundPrimary
                     .ignoresSafeArea()
 
-                if accounts.isEmpty {
+                if visibleAccounts.isEmpty {
                     emptyState
                 } else {
                     accountList
@@ -44,6 +61,9 @@ struct AIMonitorView: View {
                 AIAccountDetailView(account: account)
             }
             .task {
+                // Provide modelContext to AIUsageService for snapshot recording
+                AIUsageService.shared.modelContext = modelContext
+
                 // Hydrate AI account list from Firestore on first appearance —
                 // restores nicknames / thresholds / last usage snapshot after
                 // reinstall.
@@ -79,22 +99,25 @@ struct AIMonitorView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 24) {
+        let logoSize = ipScaled(52, scale: 1.4, sizeClass: hSizeClass)
+        let iconSize = ipScaled(24, scale: 1.4, sizeClass: hSizeClass)
+        let openAIIconSize = ipScaled(26, scale: 1.4, sizeClass: hSizeClass)
+        return VStack(spacing: ipScaled(24, sizeClass: hSizeClass)) {
             Spacer()
 
             // Provider icons row (including Codex)
             HStack(spacing: 16) {
-                ProviderLogoView(provider: .claude, size: 52, iconSize: 24)
-                ProviderLogoView(provider: .openai, size: 52, iconSize: 26)
-                CodexLogoView(size: 52, iconSize: 24)
-                ProviderLogoView(provider: .google, size: 52, iconSize: 24)
+                ProviderLogoView(provider: .claude, size: logoSize, iconSize: iconSize)
+                ProviderLogoView(provider: .openai, size: logoSize, iconSize: openAIIconSize)
+                CodexLogoView(size: logoSize, iconSize: iconSize)
+                ProviderLogoView(provider: .google, size: logoSize, iconSize: iconSize)
             }
 
             VStack(spacing: 8) {
                 Text(L10n.aiNoAccounts)
-                    .font(.title3.bold())
+                    .font(.system(size: ipScaled(20, scale: 1.4, sizeClass: hSizeClass), weight: .bold))
                 Text(L10n.aiNoAccountsDesc)
-                    .font(.subheadline)
+                    .font(.system(size: ipScaled(15, scale: 1.4, sizeClass: hSizeClass)))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -104,7 +127,7 @@ struct AIMonitorView: View {
                 showAddAccount = true
             } label: {
                 Text(L10n.aiAddAccount)
-                    .font(.headline)
+                    .font(.system(size: ipScaled(17, scale: 1.4, sizeClass: hSizeClass), weight: .semibold))
                     .padding(.horizontal, 24)
             }
             .buttonStyle(.borderedProminent)
@@ -113,6 +136,7 @@ struct AIMonitorView: View {
             Spacer()
             Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Account List
@@ -126,7 +150,7 @@ struct AIMonitorView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
+                ForEach(Array(sortedAccounts.enumerated()), id: \.element.id) { index, account in
                     AIUsageCardView(account: account)
                         .contentShape(Rectangle())
                         .onTapGesture {

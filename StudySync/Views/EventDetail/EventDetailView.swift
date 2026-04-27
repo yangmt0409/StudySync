@@ -5,6 +5,7 @@ import PhotosUI
 struct EventDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Bindable var event: CountdownEvent
 
     @State private var selectedTab = 0
@@ -44,6 +45,7 @@ struct EventDetailView: View {
                         .fontWeight(.semibold)
                 }
             }
+            .dismissKeyboardToolbar()
             .onDisappear {
                 // Sync any inline edits (theme, color, font, etc.) to Firestore.
                 // Skip if we just deleted the event from this sheet.
@@ -53,7 +55,7 @@ struct EventDetailView: View {
             .sheet(isPresented: $showShareCard) {
                 ShareCardPreviewView(event: event)
             }
-            .sheet(isPresented: $showingPaywall) {
+            .fullScreenCover(isPresented: $showingPaywall) {
                 PaywallView()
             }
             .fullScreenCover(isPresented: $showCelebration) {
@@ -453,7 +455,7 @@ struct EventDetailView: View {
                     let colors = ["#5B7FFF", "#FF6B6B", "#4ECDC4", "#FFB347",
                                   "#A78BFA", "#F472B6", "#34D399", "#FBBF24",
                                   "#6366F1", "#EC4899"]
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 5), spacing: 12) {
+                    LazyVGrid(columns: iPadGridColumns(iPhone: 5, spacing: 12, sizeClass: hSizeClass), spacing: 12) {
                         ForEach(colors, id: \.self) { hex in
                             Circle()
                                 .fill(Color(hex: hex))
@@ -553,6 +555,65 @@ struct EventDetailView: View {
         .padding(16)
     }
 
+    // MARK: - Review Plan
+
+    private struct ReviewDateItem {
+        let label: String
+        let date: Date
+        let isPast: Bool
+    }
+
+    private var reviewDates: [ReviewDateItem] {
+        let calendar = Calendar.current
+        let now = Date()
+        let pairs: [(Int, String)] = [
+            (7, L10n.examReview7d),
+            (3, L10n.examReview3d),
+            (1, L10n.examReview1d),
+        ]
+        return pairs.compactMap { (days, label) in
+            guard let date = calendar.date(byAdding: .day, value: -days, to: event.endDate) else { return nil }
+            return ReviewDateItem(label: label, date: date, isPast: date < now)
+        }
+    }
+
+    @ViewBuilder
+    private var reviewPlanCard: some View {
+        if event.isExam {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "book.fill")
+                            .foregroundStyle(.orange)
+                        Text(L10n.examReviewPlan)
+                            .font(SSFont.bodyMedium)
+                    }
+
+                    ForEach(reviewDates, id: \.label) { item in
+                        HStack(spacing: 12) {
+                            Image(systemName: item.isPast ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(item.isPast ? .green : .secondary)
+                            VStack(alignment: .leading) {
+                                Text(item.label)
+                                    .font(SSFont.bodyMedium)
+                                Text(item.date, style: .date)
+                                    .font(SSFont.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if !item.isPast && Calendar.current.isDateInToday(item.date) {
+                                Text(L10n.examReviewToday)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
     // MARK: - Tab 4: More
 
     private var moreTab: some View {
@@ -589,6 +650,8 @@ struct EventDetailView: View {
                     }
                     .padding(.vertical, 4)
                 }
+
+                reviewPlanCard
 
                 GroupBox(L10n.infoSection) {
                     VStack(spacing: 8) {
@@ -633,7 +696,7 @@ struct EventDetailView: View {
         ]
 
         return GroupBox(title) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+            LazyVGrid(columns: iPadGridColumns(iPhone: 5, spacing: 10, sizeClass: hSizeClass), spacing: 10) {
                 ForEach(colorChoices, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))

@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseAuth
 
 struct FriendsListView: View {
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     private var auth: AuthService { .shared }
 
     @State private var friends: [FriendInfo] = []
@@ -257,32 +258,46 @@ struct FriendsListView: View {
     // MARK: - Empty
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        // Custom layout (not SSEmptyStateView) because the CTA is a
+        // NavigationLink, not a Button — the shared component takes a
+        // `() -> Void` action which can't drive NavigationLink push state.
+        // Sizing/colors still match SSEmptyStateView for visual parity.
+        VStack(spacing: ipScaled(SSSpacing.xl, sizeClass: hSizeClass)) {
             Spacer().frame(height: 60)
             Image(systemName: "person.2.slash")
-                .font(.system(size: 48))
-                .foregroundStyle(Color(.tertiaryLabel))
-            Text(L10n.socialNoFriends)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(L10n.socialNoFriendsDesc)
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .font(.system(size: ipScaled(48, scale: 1.6, sizeClass: hSizeClass)))
+                .foregroundStyle(SSColor.brand.opacity(SSOpacity.disabled))
+
+            VStack(spacing: ipScaled(SSSpacing.md, sizeClass: hSizeClass)) {
+                Text(L10n.socialNoFriends)
+                    .font(.system(size: ipScaled(17, scale: 1.5, sizeClass: hSizeClass), weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(L10n.socialNoFriendsDesc)
+                    .font(.system(size: ipScaled(14, scale: 1.4, sizeClass: hSizeClass)))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SSSpacing.xxxl)
+            }
 
             NavigationLink {
                 AddFriendView()
             } label: {
-                Label(L10n.socialAddFriend, systemImage: "person.badge.plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(Color(hex: "#5B7FFF").gradient))
+                HStack(spacing: SSSpacing.md) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: ipScaled(14, scale: 1.4, sizeClass: hSizeClass), weight: .bold))
+                    Text(L10n.socialAddFriend)
+                        .font(.system(size: ipScaled(15, scale: 1.4, sizeClass: hSizeClass), weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, ipScaled(SSSpacing.xxxl, sizeClass: hSizeClass))
+                .padding(.vertical, ipScaled(SSSpacing.lg, sizeClass: hSizeClass))
+                .background(Capsule().fill(SSColor.brand))
             }
-            .padding(.top, 8)
+            .padding(.top, SSSpacing.md)
+
+            Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Actions

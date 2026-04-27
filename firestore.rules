@@ -2,11 +2,78 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User profiles - anyone authed can read, only owner can write
+    // ============================================================
+    // Early bird Pro grant — tamper-proof constants
+    //
+    // Policy: anyone who signed up before Apr 24 23:59:59 Toronto time
+    // (= Apr 25 00:00 EDT = Apr 25 04:00 UTC) gets lifetime Pro on their
+    // first launch on/after Apr 27 00:00 Toronto time.
+    //
+    // The client reconciler writes `proLifetime = true` once eligible.
+    // These rules make sure a malicious client cannot:
+    //   - edit createdAt to fake eligibility
+    //   - flip proLifetime from false → true without meeting conditions
+    //   - revoke their own grant (proLifetime can only go false → true)
+    //   - forge earlyBirdGrantedAt after the fact
+    // ============================================================
+    function earlyBirdRegistrationCutoffMs()  { return 1777089600000; }  // 2026-04-25 04:00 UTC
+    function earlyBirdGrantActiveFromMs()     { return 1777262400000; }  // 2026-04-27 04:00 UTC
+
+    function fieldUnchanged(field) {
+      return (field in resource.data) == (field in request.resource.data)
+        && (!(field in resource.data) || request.resource.data[field] == resource.data[field]);
+    }
+
+    function createdAtImmutable() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function proLifetimeWriteAllowed() {
+      let oldLifetime = resource.data.get('proLifetime', false);
+      let newLifetime = request.resource.data.get('proLifetime', false);
+      return
+        // unchanged
+        newLifetime == oldLifetime
+        // OR: valid false→true transition with registration + grant-window eligibility
+        || (
+          oldLifetime == false
+          && newLifetime == true
+          && resource.data.createdAt.toMillis() < earlyBirdRegistrationCutoffMs()
+          && request.time.toMillis() >= earlyBirdGrantActiveFromMs()
+        );
+    }
+
+    function earlyBirdGrantedAtWriteAllowed() {
+      let oldSet = 'earlyBirdGrantedAt' in resource.data
+        && resource.data.earlyBirdGrantedAt != null;
+      let newSet = 'earlyBirdGrantedAt' in request.resource.data
+        && request.resource.data.earlyBirdGrantedAt != null;
+      return
+        // unchanged (both unset, or both set to same value)
+        fieldUnchanged('earlyBirdGrantedAt')
+        // OR: first-time set alongside a valid proLifetime grant
+        || (
+          !oldSet
+          && newSet
+          && request.resource.data.proLifetime == true
+          && request.resource.data.earlyBirdGrantedAt == request.time
+        );
+    }
+
+    // User profiles - anyone authed can read, only owner can write.
+    // Update is additionally locked down against Pro entitlement tampering.
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId
+                    // New accounts cannot be born lifetime — that can only
+                    // happen through the reconciler path with server-time check.
+                    && request.resource.data.get('proLifetime', false) == false
+                    && !('earlyBirdGrantedAt' in request.resource.data
+                         && request.resource.data.earlyBirdGrantedAt != null);
+      allow update: if request.auth.uid == userId
+                    && createdAtImmutable()
+                    && proLifetimeWriteAllowed()
+                    && earlyBirdGrantedAtWriteAllowed();
       allow delete: if request.auth.uid == userId;
 
       // Friends subcollection
@@ -82,6 +149,47 @@ service cloud.firestore {
       match /aiAccounts/{accountId} {
         allow read, write: if request.auth.uid == userId;
       }
+
+      // Todo items - private to owner. Added in v1.0.2 hotfix; previously
+      // todos relied on iCloud SwiftData/CloudKit only, which silently no-
+      // ops for users with iCloud Sync disabled (the default).
+      match /todos/{todoId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      // Travel events (flights / trains / etc) - private to owner.
+      // Added in v1.0.2 hotfix; was deferred from initial Travel rollout.
+      match /travelEvents/{travelId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      // Focus sessions (focus history backing analytics + study space
+      // unlocks) - private to owner.
+      match /focusSessions/{sessionId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      // Study space items (desk decoration unlocks) - private to owner.
+      // Doc id is the catalog string (e.g. "desk_lamp"), giving us
+      // idempotent writes when the user unlocks the same item from
+      // two devices simultaneously.
+      match /spaceItems/{itemId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Study Room - any authed user can read; a user can only write their own document
+    match /studyRoom/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Group Focus - any authed user can read/write
+    match /groupFocus/{roomId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null;
     }
 
     // Team Projects - members can read, authed users can create/update

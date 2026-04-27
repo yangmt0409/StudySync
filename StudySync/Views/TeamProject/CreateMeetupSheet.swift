@@ -201,6 +201,7 @@ struct CreateMeetupSheet: View {
                 .padding(.horizontal, SSSpacing.xl)
                 .padding(.bottom, SSSpacing.xxl)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background {
                 SSColor.backgroundPrimary.ignoresSafeArea()
             }
@@ -211,6 +212,7 @@ struct CreateMeetupSheet: View {
                     Button(L10n.cancel) { dismiss() }
                 }
             }
+            .dismissKeyboardToolbar()
         }
     }
 

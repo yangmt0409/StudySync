@@ -33,9 +33,11 @@ struct GradeCourseDetailView: View {
             .padding(.top, SSSpacing.md)
             .padding(.bottom, SSSpacing.xxxl)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background { SSColor.backgroundPrimary.ignoresSafeArea() }
         .navigationTitle(course.name)
         .navigationBarTitleDisplayMode(.inline)
+        .dismissKeyboardToolbar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

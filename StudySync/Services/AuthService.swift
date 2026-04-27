@@ -71,7 +71,13 @@ final class AuthService: NSObject {
             )
 
             do {
-                let authResult = try await Auth.auth().signIn(with: credential)
+                // 12s timeout: Firebase auth endpoints are blocked in
+                // mainland China — without this, the call hangs for ~75s
+                // and Chinese users force-quit the frozen spinner.
+                // See AsyncTimeout.swift for the full writeup.
+                let authResult = try await withTimeout(seconds: 12) {
+                    try await Auth.auth().signIn(with: credential)
+                }
                 currentUser = authResult.user
 
                 // Create profile if first time
@@ -109,7 +115,11 @@ final class AuthService: NSObject {
         errorMessage = nil
 
         do {
-            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            // 12s timeout — see AsyncTimeout.swift. Firebase auth is blocked
+            // in mainland China; without this the call hangs ~75s.
+            let result = try await withTimeout(seconds: 12) {
+                try await Auth.auth().signIn(withEmail: email, password: password)
+            }
             currentUser = result.user
             await loadProfile(uid: result.user.uid)
 
@@ -137,13 +147,18 @@ final class AuthService: NSObject {
         errorMessage = nil
 
         do {
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            // 12s timeout — see AsyncTimeout.swift.
+            let result = try await withTimeout(seconds: 12) {
+                try await Auth.auth().createUser(withEmail: email, password: password)
+            }
             currentUser = result.user
 
             // Update display name
             let changeRequest = result.user.createProfileChangeRequest()
             changeRequest.displayName = displayName
-            try await changeRequest.commitChanges()
+            try await withTimeout(seconds: 8) {
+                try await changeRequest.commitChanges()
+            }
 
             await createProfileIfNeeded(uid: result.user.uid, email: email, displayName: displayName, birthday: birthday)
         } catch {
@@ -171,7 +186,11 @@ final class AuthService: NSObject {
         defer { isLoading = false }
 
         do {
-            try await Auth.auth().sendPasswordReset(withEmail: trimmed)
+            // 10s timeout — see AsyncTimeout.swift. Without this CN users
+            // get a frozen "Send reset email" button for ~75s.
+            try await withTimeout(seconds: 10) {
+                try await Auth.auth().sendPasswordReset(withEmail: trimmed)
+            }
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -195,10 +214,73 @@ final class AuthService: NSObject {
         }
     }
 
+    // MARK: - Delete Account
+
+    enum DeleteAccountError: LocalizedError {
+        case notSignedIn
+        case reauthenticationRequired
+        case firebaseError(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .notSignedIn: return L10n.deleteAccountErrorNotSignedIn
+            case .reauthenticationRequired: return L10n.deleteAccountErrorReauth
+            case .firebaseError(let err): return err.localizedDescription
+            }
+        }
+    }
+
+    /// Delete the user's account permanently.
+    /// Steps:
+    /// 1. Clear FCM token so push stops targeting this device
+    /// 2. Delete all Firestore data (profile, subcollections, reciprocal cleanup)
+    /// 3. Delete Firebase Auth account
+    /// 4. Clear local observable state
+    ///
+    /// Firebase requires recent authentication to call `user.delete()`. If the
+    /// credential is too old, `.reauthenticationRequired` is thrown — the caller
+    /// should prompt the user to sign in again and retry.
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw DeleteAccountError.notSignedIn
+        }
+        let uid = user.uid
+
+        // Stop push / listeners first — failures here are non-fatal
+        await PushNotificationService.shared.clearToken()
+        InAppNotificationManager.shared.stopListening()
+
+        // Firestore cleanup runs best-effort (errors logged but not thrown)
+        await FirestoreService.shared.deleteAllUserData(uid: uid)
+
+        // Final step: delete the Auth user. This is the only step that must succeed
+        // — if this fails the account still exists and Apple's review fails.
+        do {
+            try await user.delete()
+        } catch let nsError as NSError {
+            // AuthErrorCode.requiresRecentLogin == 17014
+            if nsError.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                throw DeleteAccountError.reauthenticationRequired
+            }
+            throw DeleteAccountError.firebaseError(nsError)
+        }
+
+        currentUser = nil
+        userProfile = nil
+    }
+
     // MARK: - Profile
 
     func loadProfile(uid: String) async {
-        userProfile = await FirestoreService.shared.getUserProfile(uid: uid)
+        let loaded = await FirestoreService.shared.getUserProfile(uid: uid)
+        // Reconcile Pro entitlement on every profile load:
+        //   - grants early bird lifetime Pro if eligible
+        //   - syncs `roles` array to match actual Pro state (handles expired rewards)
+        let reconciled = await ProEntitlementService.reconcile(
+            profile: loaded,
+            storeKitPurchased: StoreManager.shared.isPurchasedPro
+        )
+        userProfile = reconciled ?? loaded
     }
 
     private func createProfileIfNeeded(uid: String, email: String, displayName: String, birthday: Date? = nil) async {
@@ -221,13 +303,16 @@ final class AuthService: NSObject {
 
     private func randomNonceString(length: Int = 32) -> String {
         precondition(length > 0)
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
         var randomBytes = [UInt8](repeating: 0, count: length)
         let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-        if errorCode != errSecSuccess {
-            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+        if errorCode == errSecSuccess {
+            return String(randomBytes.map { charset[Int($0) % charset.count] })
         }
-        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-        return String(randomBytes.map { charset[Int($0) % charset.count] })
+        // Fallback: UUID is backed by the same secure random pool and is safe for single-use nonces.
+        // Avoid fatalError so Apple Sign-In degrades gracefully if the CSPRNG is momentarily unavailable.
+        debugPrint("[AuthService] SecRandomCopyBytes failed (OSStatus \(errorCode)), using UUID fallback")
+        return (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "").prefix(length).description
     }
 
     private func sha256(_ input: String) -> String {

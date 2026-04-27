@@ -15,18 +15,18 @@ struct JoinProjectView: View {
             ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
-                VStack(spacing: 24) {
+                VStack(spacing: SSSpacing.xxxl) {
                     Spacer().frame(height: 20)
 
                     Image(systemName: "person.badge.plus")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color(hex: "#5B7FFF"))
+                        .foregroundStyle(SSColor.brand)
 
                     Text(L10n.projectJoin)
                         .font(.system(size: 22, weight: .bold))
 
                     Text(L10n.projectEnterCode)
-                        .font(.system(size: 14))
+                        .font(SSFont.secondary)
                         .foregroundStyle(.secondary)
 
                     // Scan QR button
@@ -34,17 +34,17 @@ struct JoinProjectView: View {
                         HapticEngine.shared.lightImpact()
                         showScanner = true
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: SSSpacing.md) {
                             Image(systemName: "qrcode.viewfinder")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(SSFont.bodySemibold)
                             Text(L10n.projectScanQR)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(SSFont.bodySmallSemibold)
                         }
-                        .foregroundStyle(Color(hex: "#5B7FFF"))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
+                        .foregroundStyle(SSColor.brand)
+                        .padding(.horizontal, SSSpacing.xxl)
+                        .padding(.vertical, SSSpacing.mdLg)
                         .background(
-                            Capsule().fill(Color(hex: "#5B7FFF").opacity(0.12))
+                            Capsule().fill(SSColor.brand.opacity(SSOpacity.tagBackground))
                         )
                     }
 
@@ -54,9 +54,9 @@ struct JoinProjectView: View {
                         .multilineTextAlignment(.center)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
-                        .padding(16)
+                        .padding(SSSpacing.xl)
                         .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                                 .fill(Color(.secondarySystemGroupedBackground))
                         )
                         .padding(.horizontal, 40)
@@ -66,11 +66,11 @@ struct JoinProjectView: View {
 
                     // Result message
                     if let message = resultMessage {
-                        HStack(spacing: 6) {
+                        HStack(spacing: SSSpacing.sm) {
                             Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundStyle(isSuccess ? .green : .red)
                             Text(message)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(isSuccess ? .green : .red)
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -85,16 +85,16 @@ struct JoinProjectView: View {
                                 .tint(.white)
                         } else {
                             Text(L10n.projectJoin)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(SSFont.heading3)
                         }
 
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, SSSpacing.lgXl)
                     .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color(hex: "#5B7FFF").opacity(code.count == 8 ? 1 : 0.4))
+                        RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
+                            .fill(SSColor.brand.opacity(code.count == 8 ? 1 : SSOpacity.disabled))
                     )
                     .padding(.horizontal, 40)
                     .disabled(code.count != 8 || isJoining)
@@ -131,6 +131,7 @@ struct JoinProjectView: View {
                     }
                 }
             }
+            .dismissKeyboardToolbar()
         }
     }
 

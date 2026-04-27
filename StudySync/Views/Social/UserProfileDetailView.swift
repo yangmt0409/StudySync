@@ -181,12 +181,43 @@ struct UserProfileDetailView: View {
                                     .frame(width: 44, height: 44)
                                     .background(
                                         Circle()
-                                            .fill(badge.color.opacity(0.15))
+                                            .fill(badge.color.opacity(SSOpacity.lightTint))
                                     )
                                 Text(badge.name)
                                     .font(SSFont.badge)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Showcase decorations (desk items)
+            if let profile, !profile.showcaseDecorations.isEmpty {
+                Divider()
+
+                VStack(spacing: SSSpacing.md) {
+                    Text(L10n.profileMyDesk)
+                        .font(SSFont.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: SSSpacing.lg) {
+                        ForEach(profile.showcaseDecorations, id: \.self) { itemId in
+                            if let item = StudySpaceItem.catalog.first(where: { $0.id == itemId }) {
+                                VStack(spacing: SSSpacing.xs) {
+                                    Text(item.emoji)
+                                        .font(.system(size: 26))
+                                        .frame(width: 44, height: 44)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: SSRadius.small)
+                                                .fill(Color(hex: "#F59E0B").opacity(SSOpacity.tagBackground))
+                                        )
+                                    Text(item.name)
+                                        .font(SSFont.badge)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                     }
@@ -235,7 +266,7 @@ struct UserProfileDetailView: View {
                     value: formatFocusTime(focusMinutes),
                     label: L10n.focusTime,
                     icon: "timer",
-                    color: Color(hex: "#7C3AED")
+                    color: SSColor.brandPurple
                 )
 
                 Divider()
@@ -299,7 +330,7 @@ struct UserProfileDetailView: View {
             } label: {
                 actionRow(
                     icon: "calendar.day.timeline.left",
-                    color: Color(hex: "#FFB347"),
+                    color: SSColor.life,
                     title: L10n.profileViewTimeline
                 )
             }

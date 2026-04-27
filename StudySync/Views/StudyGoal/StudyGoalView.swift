@@ -4,6 +4,7 @@ import SwiftData
 struct StudyGoalView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Query(filter: #Predicate<StudyGoal> { $0.isArchived == false },
            sort: \StudyGoal.createdAt, order: .reverse)
     private var activeGoals: [StudyGoal]
@@ -64,7 +65,7 @@ struct StudyGoalView: View {
             .sheet(isPresented: $viewModel.showingAddGoal) {
                 AddStudyGoalView()
             }
-            .sheet(isPresented: $viewModel.showingPaywall) {
+            .fullScreenCover(isPresented: $viewModel.showingPaywall) {
                 PaywallView()
             }
             .onAppear {
@@ -101,38 +102,16 @@ struct StudyGoalView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 80)
-
-            Image(systemName: "target")
-                .font(.system(size: 56))
-                .foregroundStyle(SSColor.brand.opacity(0.4))
-
-            Text(L10n.goalEmptyTitle)
-                .font(SSFont.heading3)
-                .foregroundStyle(.primary)
-
-            Text(L10n.goalEmptySubtitle)
-                .font(SSFont.secondary)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Button {
+        SSEmptyStateView(
+            systemImage: "target",
+            title: L10n.goalEmptyTitle,
+            subtitle: L10n.goalEmptySubtitle,
+            iconColor: SSColor.brand,
+            cta: .init(label: L10n.goalAddGoal) {
                 viewModel.tryAddGoal(activeCount: activeGoals.count)
                 HapticEngine.shared.lightImpact()
-            } label: {
-                Label(L10n.goalAddGoal, systemImage: "plus")
-                    .font(SSFont.bodySemibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 12)
-                    .background(
-                        Capsule().fill(SSColor.brand.gradient)
-                    )
             }
-            .padding(.top, SSSpacing.md)
-        }
+        )
     }
 
     // MARK: - Active Goals

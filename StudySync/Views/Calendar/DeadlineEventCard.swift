@@ -58,7 +58,7 @@ struct DeadlineEventCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SSSpacing.lg) {
             // Checkbox
             checkboxView
 
@@ -66,26 +66,27 @@ struct DeadlineEventCard: View {
             // (integrated into overlay)
 
             // Content
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                HStack(spacing: SSSpacing.xs) {
                     Text("⚠️")
-                        .font(.system(size: 12))
+                        .font(SSFont.footnote)
                         .opacity(isCompleted ? 0.3 : 1.0)
 
                     Text(event.title ?? L10n.noTitle)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(SSFont.bodySmallSemibold)
                         .foregroundStyle(isCompleted ? .secondary : .primary)
                         .strikethrough(isCompleted, color: .secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                 }
 
                 if event.isAllDay {
                     Text(L10n.allDay)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Text(timeRangeText)
-                        .font(.system(size: 13))
+                        .font(SSFont.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -106,13 +107,13 @@ struct DeadlineEventCard: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(14)
+        .padding(SSSpacing.lgXl)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .fill(isCompleted
                       ? Color(.tertiarySystemFill)
                       : isOverdue
-                        ? Color.red.opacity(0.08)
+                        ? Color.red.opacity(SSOpacity.shadow)
                         : urgencyLevel > 0.3
                             ? urgencyColor.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground))
@@ -122,11 +123,11 @@ struct DeadlineEventCard: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(sideColor)
                 .frame(width: isOverdue ? 4 : 3)
-                .padding(.vertical, 8)
+                .padding(.vertical, SSSpacing.md)
         }
         // Urgency / overdue border
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: SSRadius.medium, style: .continuous)
                 .stroke(
                     isCompleted ? Color.clear
                     : isOverdue ? Color.red.opacity(0.6)

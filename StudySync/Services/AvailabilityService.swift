@@ -205,7 +205,6 @@ final class AvailabilityService {
     }
 
     private func cleanupPastDays(uid: String) async {
-        let todayString = weekDateStrings.first ?? ""
         // We can't easily list subcollection docs without querying, so we just
         // try to delete the last 7 past days (safe if they don't exist)
         let cal = Calendar.current

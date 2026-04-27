@@ -5,6 +5,7 @@ struct AddGradeCourseView: View {
     @Bindable var viewModel: GradeCalculatorViewModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     @State private var name = ""
     @State private var emoji = "📘"
@@ -136,6 +137,7 @@ struct AddGradeCourseView: View {
                 .padding(.top, SSSpacing.xl)
                 .padding(.bottom, SSSpacing.xxl)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background { SSColor.backgroundPrimary.ignoresSafeArea() }
             .navigationTitle(L10n.gradeAddCourse)
             .navigationBarTitleDisplayMode(.inline)
@@ -144,13 +146,14 @@ struct AddGradeCourseView: View {
                     Button(L10n.cancel) { dismiss() }
                 }
             }
+            .dismissKeyboardToolbar()
         }
     }
 
     // MARK: - Emoji Picker
 
     private var emojiPicker: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: SSSpacing.md), count: 8)
+        let columns = iPadGridColumns(iPhone: 8, spacing: SSSpacing.md, sizeClass: hSizeClass)
         return LazyVGrid(columns: columns, spacing: SSSpacing.md) {
             ForEach(emojiOptions, id: \.self) { em in
                 Text(em)
@@ -176,7 +179,7 @@ struct AddGradeCourseView: View {
 
     private var colorPicker: some View {
         VStack(alignment: .leading, spacing: SSSpacing.sm) {
-            let columns = Array(repeating: GridItem(.flexible()), count: 6)
+            let columns = iPadGridColumns(iPhone: 6, spacing: 8, sizeClass: hSizeClass)
             LazyVGrid(columns: columns, spacing: SSSpacing.md) {
                 ForEach(colorOptions, id: \.self) { hex in
                     Circle()

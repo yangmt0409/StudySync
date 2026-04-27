@@ -22,9 +22,19 @@ final class StoreManager {
 
     private var transactionListener: Task<Void, Error>?
 
-    /// True if user has Pro via StoreKit purchase OR an active focus challenge reward
+    /// True if user has Pro via StoreKit, lifetime grant (early bird / lifetime IAP),
+    /// or an active focus challenge reward.
+    ///
+    /// This is the single source of truth for gating Pro features in the UI.
+    /// Keep it aligned with `UserProfile.isProActive(...)` on the server side.
     var isPro: Bool {
-        isPurchasedPro || hasActiveProReward
+        isPurchasedPro || hasLifetimeGrant || hasActiveProReward
+    }
+
+    /// True if the current profile has `proLifetime = true`.
+    /// Falls back to false when no profile is loaded (e.g. signed out).
+    var hasLifetimeGrant: Bool {
+        AuthService.shared.userProfile?.proLifetime == true
     }
 
     var hasActiveProReward: Bool {
@@ -58,8 +68,15 @@ final class StoreManager {
 
         do {
             let products = try await Product.products(for: [productID])
-            product = products.first
+            if let first = products.first {
+                product = first
+                debugPrint("[Store] Product loaded: \(first.id) — \(first.displayPrice)")
+            } else {
+                debugPrint("[Store] Product ID \(productID) returned no results — not yet approved on App Store Connect?")
+                errorMessage = L10n.productLoadError
+            }
         } catch {
+            debugPrint("[Store] loadProduct error: \(error)")
             errorMessage = L10n.productLoadError
         }
 
@@ -86,10 +103,8 @@ final class StoreManager {
                 let transaction = try checkVerified(verification)
                 isPurchasedPro = true
                 await transaction.finish()
-                // Sync Pro role
-                if let uid = Auth.auth().currentUser?.uid {
-                    Task { await FirestoreService.shared.syncProRole(uid: uid, isPro: true) }
-                }
+                // Reconcile roles against the new purchase state
+                await reconcileProfile()
                 isLoading = false
                 return true
 
@@ -150,9 +165,24 @@ final class StoreManager {
         let changed = isPurchasedPro != found
         isPurchasedPro = found
 
-        // Sync Pro role to Firestore when purchase status changes
-        if changed, let uid = Auth.auth().currentUser?.uid {
-            Task { await FirestoreService.shared.syncProRole(uid: uid, isPro: found) }
+        // Reconcile Firestore roles against updated purchase state
+        if changed {
+            await reconcileProfile()
+        }
+    }
+
+    /// Shared helper: re-runs the Pro entitlement reconciler using the currently
+    /// loaded profile. Called after purchase, expiry changes, or startup status check.
+    @MainActor
+    private func reconcileProfile() async {
+        guard Auth.auth().currentUser?.uid != nil else { return }
+        let current = AuthService.shared.userProfile
+        let reconciled = await ProEntitlementService.reconcile(
+            profile: current,
+            storeKitPurchased: isPurchasedPro
+        )
+        if let reconciled {
+            AuthService.shared.userProfile = reconciled
         }
     }
 
@@ -197,12 +227,18 @@ final class StoreManager {
         UserDefaults.standard.set(newExpiry, forKey: proRewardKey)
         UserDefaults.standard.set(Self.monthKey(), forKey: challengeClaimedKey)
 
-        // Sync to Firestore
+        // Sync to Firestore + reconcile roles (adds "pro" if not already present)
         if let uid = Auth.auth().currentUser?.uid {
             Task {
                 await FirestoreService.shared.updateProfile(uid: uid, fields: [
                     "proRewardExpiresAt": newExpiry
                 ])
+                // Update local profile so the reconciler sees the fresh expiry
+                if var profile = AuthService.shared.userProfile {
+                    profile.proRewardExpiresAt = newExpiry
+                    AuthService.shared.userProfile = profile
+                }
+                await reconcileProfile()
             }
         }
     }

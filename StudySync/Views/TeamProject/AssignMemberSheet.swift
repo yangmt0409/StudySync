@@ -28,7 +28,7 @@ struct AssignMemberSheet: View {
                         }
                         HapticEngine.shared.selection()
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: SSSpacing.lg) {
                             Text(member.avatarEmoji)
                                 .font(.system(size: 24))
                                 .frame(width: 36, height: 36)
@@ -38,11 +38,11 @@ struct AssignMemberSheet: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(member.displayName)
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(SSFont.bodyMedium)
                                     .foregroundStyle(.primary)
                                 if member.role == .owner {
                                     Text(L10n.projectOwner)
-                                        .font(.system(size: 12))
+                                        .font(SSFont.footnote)
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -51,7 +51,7 @@ struct AssignMemberSheet: View {
 
                             if selected {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(Color(hex: "#5B7FFF"))
+                                    .foregroundStyle(SSColor.brand)
                             } else {
                                 Image(systemName: "circle")
                                     .foregroundStyle(.tertiary)

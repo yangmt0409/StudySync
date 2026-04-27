@@ -61,12 +61,14 @@ struct ToolsView: View {
                 .padding(.horizontal, SSSpacing.xl)
                 .padding(.top, SSSpacing.md)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background {
                 SSColor.backgroundPrimary
                     .ignoresSafeArea()
             }
             .navigationTitle(L10n.tools)
             .navigationBarTitleDisplayMode(.large)
+            .dismissKeyboardToolbar()
             .onReceive(timer) { _ in
                 currentTime = Date()
             }

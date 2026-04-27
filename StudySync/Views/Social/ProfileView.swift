@@ -1,13 +1,17 @@
 import SwiftUI
+import SwiftData
 import FirebaseAuth
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Query private var unlockedSpaceItems: [StudySpaceItem]
     private var auth: AuthService { .shared }
 
     @State private var displayName: String = ""
     @State private var avatarEmoji: String = "😊"
     @State private var showcaseBadges: [String] = []
+    @State private var showcaseDecorations: [String] = []
     @State private var isSaving = false
     @State private var showSaveSuccess = false
     @State private var showUnsavedAlert = false
@@ -16,9 +20,14 @@ struct ProfileView: View {
     @State private var initialName: String = ""
     @State private var initialEmoji: String = "😊"
     @State private var initialBadges: [String] = []
+    @State private var initialDecorations: [String] = []
 
     private var hasUnsavedChanges: Bool {
-        displayName != initialName || avatarEmoji != initialEmoji || showcaseBadges != initialBadges
+        displayName != initialName || avatarEmoji != initialEmoji || showcaseBadges != initialBadges || showcaseDecorations != initialDecorations
+    }
+
+    private var unlockedItemIds: Set<String> {
+        Set(unlockedSpaceItems.map(\.itemId))
     }
 
     private let emojiOptions = [
@@ -31,7 +40,7 @@ struct ProfileView: View {
         Form {
             // Avatar
             Section {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                LazyVGrid(columns: iPadGridColumns(iPhone: 6, spacing: SSSpacing.md, sizeClass: hSizeClass), spacing: SSSpacing.lg) {
                     ForEach(emojiOptions, id: \.self) { emoji in
                         Button {
                             avatarEmoji = emoji
@@ -44,18 +53,18 @@ struct ProfileView: View {
                                 .background(
                                     Circle()
                                         .fill(avatarEmoji == emoji
-                                              ? Color(hex: "#5B7FFF").opacity(0.15)
+                                              ? SSColor.brand.opacity(SSOpacity.lightTint)
                                               : Color(.tertiarySystemFill))
                                 )
                                 .overlay(
                                     Circle()
-                                        .stroke(avatarEmoji == emoji ? Color(hex: "#5B7FFF") : .clear, lineWidth: 2)
+                                        .stroke(avatarEmoji == emoji ? SSColor.brand : .clear, lineWidth: 2)
                                 )
                         }
                         .buttonStyle(.borderless)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, SSSpacing.xs)
             } header: {
                 Text(L10n.socialAvatar)
             }
@@ -79,7 +88,7 @@ struct ProfileView: View {
                             HapticEngine.shared.lightImpact()
                         } label: {
                             Label(L10n.socialCopy, systemImage: "doc.on.doc")
-                                .font(.system(size: 14))
+                                .font(SSFont.secondary)
                         }
                     }
                 } header: {
@@ -94,33 +103,33 @@ struct ProfileView: View {
                 Section {
                     let earnedBadges = Badge.earned(from: profile.badges)
                     if earnedBadges.isEmpty {
-                        VStack(spacing: 6) {
+                        VStack(spacing: SSSpacing.sm) {
                             Text(L10n.socialNoEarnedBadges)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(SSFont.chipLabel)
                                 .foregroundStyle(.secondary)
                             Text(L10n.socialNoEarnedBadgesDesc)
-                                .font(.system(size: 12))
+                                .font(SSFont.footnote)
                                 .foregroundStyle(.tertiary)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, SSSpacing.md)
                     } else {
                         // Current showcase
                         if !showcaseBadges.isEmpty {
-                            HStack(spacing: 12) {
+                            HStack(spacing: SSSpacing.lg) {
                                 ForEach(showcaseBadges, id: \.self) { badgeId in
                                     if let badge = Badge.badge(for: badgeId) {
-                                        VStack(spacing: 4) {
+                                        VStack(spacing: SSSpacing.xs) {
                                             Text(badge.emoji)
                                                 .font(.system(size: 28))
                                                 .frame(width: 48, height: 48)
                                                 .background(
                                                     Circle()
-                                                        .fill(badge.color.opacity(0.15))
+                                                        .fill(badge.color.opacity(SSOpacity.lightTint))
                                                 )
                                                 .overlay(
                                                     Circle()
-                                                        .stroke(badge.color.opacity(0.4), lineWidth: 1.5)
+                                                        .stroke(badge.color.opacity(SSOpacity.disabled), lineWidth: 1.5)
                                                 )
                                             Text(badge.name)
                                                 .font(.system(size: 10))
@@ -131,11 +140,11 @@ struct ProfileView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, SSSpacing.xs)
                         }
 
                         // Badge picker grid
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 10) {
+                        LazyVGrid(columns: iPadGridColumns(iPhone: 5, spacing: SSSpacing.md, sizeClass: hSizeClass), spacing: SSSpacing.mdLg) {
                             ForEach(earnedBadges) { badge in
                                 Button {
                                     toggleShowcaseBadge(badge.id)
@@ -165,13 +174,92 @@ struct ProfileView: View {
                                 .buttonStyle(.borderless)
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, SSSpacing.xs)
                     }
                 } header: {
                     Text(L10n.socialShowcaseBadges)
                 } footer: {
                     Text(L10n.socialShowcaseBadgesDesc)
                 }
+            }
+
+            // Showcase Decorations (desk items)
+            Section {
+                let unlockedDecorations = StudySpaceItem.catalog.filter { unlockedItemIds.contains($0.id) }
+                if unlockedDecorations.isEmpty {
+                    VStack(spacing: SSSpacing.sm) {
+                        Text(L10n.profileNoDecorations)
+                            .font(SSFont.chipLabel)
+                            .foregroundStyle(.secondary)
+                        Text(L10n.profileNoDecorationsDesc)
+                            .font(SSFont.footnote)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SSSpacing.md)
+                } else {
+                    // Current showcase preview — mini desk
+                    if !showcaseDecorations.isEmpty {
+                        HStack(spacing: SSSpacing.lgXl) {
+                            ForEach(showcaseDecorations, id: \.self) { itemId in
+                                if let item = StudySpaceItem.catalog.first(where: { $0.id == itemId }) {
+                                    VStack(spacing: SSSpacing.xs) {
+                                        Text(item.emoji)
+                                            .font(.system(size: 28))
+                                            .frame(width: 48, height: 48)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: SSRadius.fieldCard)
+                                                    .fill(Color(hex: "#F59E0B").opacity(SSOpacity.tagBackground))
+                                            )
+                                        Text(item.name)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, SSSpacing.xs)
+                    }
+
+                    // Decoration picker grid
+                    LazyVGrid(columns: iPadGridColumns(iPhone: 5, spacing: SSSpacing.md, sizeClass: hSizeClass), spacing: SSSpacing.mdLg) {
+                        ForEach(unlockedDecorations) { item in
+                            Button {
+                                toggleShowcaseDecoration(item.id)
+                                HapticEngine.shared.selection()
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(item.emoji)
+                                        .font(.system(size: 24))
+                                        .frame(width: 44, height: 44)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: SSRadius.small)
+                                                .fill(showcaseDecorations.contains(item.id)
+                                                      ? Color(hex: "#F59E0B").opacity(0.2)
+                                                      : Color(.tertiarySystemFill))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: SSRadius.small)
+                                                .stroke(showcaseDecorations.contains(item.id)
+                                                        ? Color(hex: "#F59E0B") : .clear, lineWidth: 2)
+                                        )
+                                    Text(item.name)
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    .padding(.vertical, SSSpacing.xs)
+                }
+            } header: {
+                Text(L10n.profileShowcaseDecorations)
+            } footer: {
+                Text(L10n.profileShowcaseDecorationsDesc)
             }
 
             // Account info
@@ -194,8 +282,10 @@ struct ProfileView: View {
                 Text(L10n.socialAccountInfo)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(L10n.socialEditProfile)
         .navigationBarTitleDisplayMode(.inline)
+        .dismissKeyboardToolbar()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button(L10n.cancel) {
@@ -214,7 +304,7 @@ struct ProfileView: View {
                         ProgressView()
                     } else {
                         Text(L10n.save)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(SSFont.bodySemibold)
                     }
                 }
                 .disabled(displayName.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -225,10 +315,12 @@ struct ProfileView: View {
                 displayName = profile.displayName
                 avatarEmoji = profile.avatarEmoji
                 showcaseBadges = profile.showcaseBadges
+                showcaseDecorations = profile.showcaseDecorations
                 // #10 Track initial values
                 initialName = profile.displayName
                 initialEmoji = profile.avatarEmoji
                 initialBadges = profile.showcaseBadges
+                initialDecorations = profile.showcaseDecorations
             }
         }
         // #10 Unsaved changes warning
@@ -241,7 +333,7 @@ struct ProfileView: View {
         // #2 Save success toast
         .overlay(alignment: .bottom) {
             if showSaveSuccess {
-                HStack(spacing: 8) {
+                HStack(spacing: SSSpacing.md) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     Text(L10n.profileSaved)
@@ -249,7 +341,7 @@ struct ProfileView: View {
                         .foregroundStyle(.primary)
                 }
                 .padding(.horizontal, SSSpacing.xl)
-                .padding(.vertical, 10)
+                .padding(.vertical, SSSpacing.mdLg)
                 .background(
                     Capsule()
                         .fill(.ultraThinMaterial)
@@ -270,6 +362,14 @@ struct ProfileView: View {
         }
     }
 
+    private func toggleShowcaseDecoration(_ itemId: String) {
+        if let index = showcaseDecorations.firstIndex(of: itemId) {
+            showcaseDecorations.remove(at: index)
+        } else if showcaseDecorations.count < 5 {
+            showcaseDecorations.append(itemId)
+        }
+    }
+
     private func saveProfile() {
         guard let uid = auth.currentUser?.uid, !isSaving else { return }
         isSaving = true
@@ -277,16 +377,19 @@ struct ProfileView: View {
             await FirestoreService.shared.updateProfile(uid: uid, fields: [
                 "displayName": displayName.trimmingCharacters(in: .whitespaces),
                 "avatarEmoji": avatarEmoji,
-                "showcaseBadges": showcaseBadges
+                "showcaseBadges": showcaseBadges,
+                "showcaseDecorations": showcaseDecorations
             ])
             auth.userProfile?.displayName = displayName
             auth.userProfile?.avatarEmoji = avatarEmoji
             auth.userProfile?.showcaseBadges = showcaseBadges
+            auth.userProfile?.showcaseDecorations = showcaseDecorations
             isSaving = false
             // Update initial values so unsaved detection is reset
             initialName = displayName
             initialEmoji = avatarEmoji
             initialBadges = showcaseBadges
+            initialDecorations = showcaseDecorations
             HapticEngine.shared.success()
             // #2 Show success toast then dismiss
             withAnimation { showSaveSuccess = true }
