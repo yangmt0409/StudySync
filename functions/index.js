@@ -8,6 +8,272 @@ initializeApp();
 const db = getFirestore();
 
 // ============================================================
+// Push notification i18n
+// ============================================================
+//
+// iOS app writes `locale` (one of zh-Hans / zh-Hant / en / ja / ko) to
+// users/{uid} alongside the FCM token. We read the receiver's locale
+// before sending and localize title + body accordingly.
+//
+// Source language is zh-Hans — any unknown locale (or missing field on
+// older clients that haven't refreshed their token since the i18n rollout)
+// falls back to zh-Hans, so existing users continue to see Chinese until
+// they next launch the app and a fresh token write fills the field in.
+//
+// Body strings can be a string or a function(params)→string for runtime
+// interpolation. Functions accept `{emoji, name, ...}` so call-sites
+// pass concrete values when invoking `localize(key, locale, params)`.
+const I18N = {
+  // Project due notifications
+  due_created_body: {
+    "zh-Hans": (p) => `${p.creator} 添加了新任务: ${p.emoji} ${p.title}`,
+    "zh-Hant": (p) => `${p.creator} 新增了任務：${p.emoji} ${p.title}`,
+    "en":      (p) => `${p.creator} added a task: ${p.emoji} ${p.title}`,
+    "ja":      (p) => `${p.creator} さんが新しいタスクを追加: ${p.emoji} ${p.title}`,
+    "ko":      (p) => `${p.creator}님이 새 작업을 추가했습니다: ${p.emoji} ${p.title}`,
+  },
+  due_completed_body: {
+    "zh-Hans": (p) => `${p.completer} 完成了任务: ${p.emoji} ${p.title} ✅`,
+    "zh-Hant": (p) => `${p.completer} 完成了任務:${p.emoji} ${p.title} ✅`,
+    "en":      (p) => `${p.completer} completed: ${p.emoji} ${p.title} ✅`,
+    "ja":      (p) => `${p.completer} さんがタスクを完了: ${p.emoji} ${p.title} ✅`,
+    "ko":      (p) => `${p.completer}님이 작업을 완료했습니다: ${p.emoji} ${p.title} ✅`,
+  },
+  due_overdue_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.title} 已逾期 ${p.days} 天!`,
+    "zh-Hant": (p) => `${p.emoji} ${p.title} 已逾期 ${p.days} 天!`,
+    "en":      (p) => `${p.emoji} ${p.title} is ${p.days} day(s) overdue!`,
+    "ja":      (p) => `${p.emoji} ${p.title} は${p.days}日遅れています!`,
+    "ko":      (p) => `${p.emoji} ${p.title} 이(가) ${p.days}일 지났습니다!`,
+  },
+  due_today_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.title} 今天截止!`,
+    "zh-Hant": (p) => `${p.emoji} ${p.title} 今天到期!`,
+    "en":      (p) => `${p.emoji} ${p.title} is due today!`,
+    "ja":      (p) => `${p.emoji} ${p.title} は本日締切です!`,
+    "ko":      (p) => `${p.emoji} ${p.title} 오늘이 마감일입니다!`,
+  },
+  due_approaching_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.title} 还有 ${p.days} 天截止`,
+    "zh-Hant": (p) => `${p.emoji} ${p.title} 還有 ${p.days} 天到期`,
+    "en":      (p) => `${p.emoji} ${p.title} is due in ${p.days} day(s)`,
+    "ja":      (p) => `${p.emoji} ${p.title} はあと${p.days}日`,
+    "ko":      (p) => `${p.emoji} ${p.title} 마감까지 ${p.days}일`,
+  },
+
+  // Invites & joins
+  project_invite_title: {
+    "zh-Hans": "项目邀请",
+    "zh-Hant": "專案邀請",
+    "en":      "Project invite",
+    "ja":      "プロジェクト招待",
+    "ko":      "프로젝트 초대",
+  },
+  project_invite_body: {
+    "zh-Hans": (p) => `${p.inviter} 邀请你加入 ${p.emoji} ${p.project}`,
+    "zh-Hant": (p) => `${p.inviter} 邀請你加入 ${p.emoji} ${p.project}`,
+    "en":      (p) => `${p.inviter} invited you to join ${p.emoji} ${p.project}`,
+    "ja":      (p) => `${p.inviter} さんが ${p.emoji} ${p.project} に招待しました`,
+    "ko":      (p) => `${p.inviter}님이 ${p.emoji} ${p.project}에 초대했습니다`,
+  },
+  member_joined_body: {
+    "zh-Hans": (p) => `${p.name} 加入了项目 🎉`,
+    "zh-Hant": (p) => `${p.name} 加入了專案 🎉`,
+    "en":      (p) => `${p.name} joined the project 🎉`,
+    "ja":      (p) => `${p.name} さんがプロジェクトに参加 🎉`,
+    "ko":      (p) => `${p.name}님이 프로젝트에 참여했습니다 🎉`,
+  },
+
+  // Friend request
+  friend_request_title: {
+    "zh-Hans": "好友请求",
+    "zh-Hant": "好友請求",
+    "en":      "Friend request",
+    "ja":      "友達リクエスト",
+    "ko":      "친구 요청",
+  },
+  friend_request_body: {
+    "zh-Hans": (p) => `${p.name} ${p.emoji} 想要添加你为好友`,
+    "zh-Hant": (p) => `${p.name} ${p.emoji} 想要加你為好友`,
+    "en":      (p) => `${p.name} ${p.emoji} wants to add you as a friend`,
+    "ja":      (p) => `${p.name} ${p.emoji} さんから友達申請が届きました`,
+    "ko":      (p) => `${p.name} ${p.emoji}님이 친구 요청을 보냈습니다`,
+  },
+
+  // Nudge (pat)
+  nudge_received_title: {
+    "zh-Hans": "拍一拍 👋",
+    "zh-Hant": "拍一拍 👋",
+    "en":      "Nudge 👋",
+    "ja":      "ナッジ 👋",
+    "ko":      "찌르기 👋",
+  },
+  nudge_received_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.name} 拍了拍你`,
+    "zh-Hant": (p) => `${p.emoji} ${p.name} 拍了拍你`,
+    "en":      (p) => `${p.emoji} ${p.name} nudged you`,
+    "ja":      (p) => `${p.emoji} ${p.name} さんがあなたをナッジしました`,
+    "ko":      (p) => `${p.emoji} ${p.name}님이 당신을 찔렀어요`,
+  },
+  nudge_delivered_title: {
+    "zh-Hans": "拍一拍已送达 ✅",
+    "zh-Hant": "拍一拍已送達 ✅",
+    "en":      "Nudge delivered ✅",
+    "ja":      "ナッジが届きました ✅",
+    "ko":      "찌르기 전달됨 ✅",
+  },
+  nudge_delivered_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.name} 已收到你的拍一拍`,
+    "zh-Hant": (p) => `${p.emoji} ${p.name} 已收到你的拍一拍`,
+    "en":      (p) => `${p.emoji} ${p.name} received your nudge`,
+    "ja":      (p) => `${p.emoji} ${p.name} さんがあなたのナッジを受け取りました`,
+    "ko":      (p) => `${p.emoji} ${p.name}님이 찌르기를 받았습니다`,
+  },
+
+  // Ring nudge
+  ring_nudge_received_title: {
+    "zh-Hans": "响铃拍一拍 🔔",
+    "zh-Hant": "響鈴拍一拍 🔔",
+    "en":      "Ring nudge 🔔",
+    "ja":      "リングナッジ 🔔",
+    "ko":      "벨 찌르기 🔔",
+  },
+  ring_nudge_received_body: {
+    "zh-Hans": (p) => `${p.emoji} ${p.name} 响铃拍了拍你!`,
+    "zh-Hant": (p) => `${p.emoji} ${p.name} 響鈴拍了拍你!`,
+    "en":      (p) => `${p.emoji} ${p.name} ring-nudged you!`,
+    "ja":      (p) => `${p.emoji} ${p.name} さんがあなたを呼んでいます!`,
+    "ko":      (p) => `${p.emoji} ${p.name}님이 벨로 찔렀습니다!`,
+  },
+  ring_nudge_delivered_title: {
+    "zh-Hans": "响铃已送达 🔔",
+    "zh-Hant": "響鈴已送達 🔔",
+    "en":      "Ring delivered 🔔",
+    "ja":      "リングが届きました 🔔",
+    "ko":      "벨 전달됨 🔔",
+  },
+  ring_nudge_delivered_body: {
+    "zh-Hans": (p) => `${p.name} 的手机已响铃`,
+    "zh-Hant": (p) => `${p.name} 的手機已響鈴`,
+    "en":      (p) => `${p.name}'s phone rang`,
+    "ja":      (p) => `${p.name} さんの電話が鳴りました`,
+    "ko":      (p) => `${p.name}님의 전화벨이 울렸습니다`,
+  },
+
+  // Generic fallback display name. Used inside other templates when the
+  // receiver's displayName is missing, so we don't leak Chinese "对方"
+  // into an English / Japanese / Korean sender's notification body.
+  friend_fallback: {
+    "zh-Hans": "对方",
+    "zh-Hant": "對方",
+    "en":      "Your friend",
+    "ja":      "相手",
+    "ko":      "상대방",
+  },
+};
+
+/**
+ * Pick the localized string from the I18N table. Falls back to zh-Hans
+ * (the source language) if the receiver's locale isn't supported or the
+ * key is missing.
+ */
+function localize(key, locale, params) {
+  const table = I18N[key];
+  if (!table) {
+    console.warn(`[i18n] missing key: ${key}`);
+    return "";
+  }
+  const value = table[locale] || table["zh-Hans"];
+  return typeof value === "function" ? value(params || {}) : value;
+}
+
+/**
+ * Read a single user's `locale` field from Firestore. Cached per Cloud
+ * Function invocation via passed-in doc when caller already fetched the
+ * user. Returns "zh-Hans" if the field is missing.
+ */
+function localeFromDoc(docData) {
+  if (!docData) return "zh-Hans";
+  return docData.locale || "zh-Hans";
+}
+
+async function fetchLocale(uid) {
+  try {
+    const doc = await db.collection("users").doc(uid).get();
+    return localeFromDoc(doc.exists ? doc.data() : null);
+  } catch {
+    return "zh-Hans";
+  }
+}
+
+/**
+ * Batch-fetch FCM tokens AND locale per UID in a single Firestore round.
+ * Returns `[{uid, token, locale}]`. Used by `sendLocalizedNotification` to
+ * group recipients by locale before sending FCM.
+ */
+async function getRecipients(uids) {
+  const recipients = [];
+  for (let i = 0; i < uids.length; i += 10) {
+    const batch = uids.slice(i, i + 10);
+    const snapshot = await db.collection("users")
+      .where("__name__", "in", batch).get();
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const token = data.fcmToken;
+      if (token) {
+        recipients.push({
+          uid: doc.id,
+          token,
+          locale: data.locale || "zh-Hans",
+        });
+      }
+    }
+  }
+  return recipients;
+}
+
+/**
+ * Send a localized push to a list of UIDs. Splits the recipients by their
+ * preferred locale and sends one FCM batch per group with that locale's
+ * title and body strings from the I18N table.
+ *
+ * `title` is either a fixed string (for user-content like project names
+ * which aren't translated) OR null in which case `titleKey` is looked up
+ * in I18N. `bodyKey` is always looked up in I18N. Both `params` and
+ * `dataPayload` are forwarded as-is to all groups.
+ */
+async function sendLocalizedNotification({
+  uids, title, titleKey, bodyKey, params, dataPayload, apnsOverrides,
+}) {
+  const recipients = await getRecipients(uids);
+  if (recipients.length === 0) return 0;
+
+  // Group recipients by locale
+  const byLocale = {};
+  for (const r of recipients) {
+    if (!byLocale[r.locale]) byLocale[r.locale] = [];
+    byLocale[r.locale].push(r.token);
+  }
+
+  let totalSent = 0;
+  for (const [locale, tokens] of Object.entries(byLocale)) {
+    const localizedTitle = title != null
+      ? title
+      : localize(titleKey, locale, params);
+    const message = {
+      notification: {
+        title: localizedTitle,
+        body: localize(bodyKey, locale, params),
+      },
+      data: dataPayload || {},
+      ...(apnsOverrides ? { apns: apnsOverrides } : {}),
+    };
+    totalSent += await sendToTokens(tokens, message);
+  }
+  return totalSent;
+}
+
+// ============================================================
 // 1. New Due Created → Notify project members
 // ============================================================
 exports.onProjectDueCreated = onDocumentCreated(
@@ -24,23 +290,22 @@ exports.onProjectDueCreated = onDocumentCreated(
     const recipientIds = project.memberIds.filter((uid) => uid !== due.createdBy);
     if (recipientIds.length === 0) return;
 
-    const tokens = await getFCMTokens(recipientIds);
-    if (tokens.length === 0) return;
-
-    const message = {
-      notification: {
-        title: `${project.emoji} ${project.name}`,
-        body: `${due.creatorName} 添加了新任务: ${due.emoji} ${due.title}`,
+    const sent = await sendLocalizedNotification({
+      uids: recipientIds,
+      title: `${project.emoji} ${project.name}`,  // user content — not localized
+      bodyKey: "due_created_body",
+      params: {
+        creator: due.creatorName,
+        emoji: due.emoji,
+        title: due.title,
       },
-      data: {
+      dataPayload: {
         type: "due_created",
         projectId: projectId,
         dueId: event.params.dueId,
       },
-    };
-
-    await sendToTokens(tokens, message);
-    console.log(`[DueCreated] Notified ${tokens.length} members for ${due.title}`);
+    });
+    console.log(`[DueCreated] Notified ${sent} members for ${due.title}`);
   }
 );
 
@@ -66,27 +331,26 @@ exports.onProjectDueCompleted = onDocumentUpdated(
     const recipientIds = project.memberIds.filter((uid) => uid !== completedBy);
     if (recipientIds.length === 0) return;
 
-    const tokens = await getFCMTokens(recipientIds);
-    if (tokens.length === 0) return;
-
     // Find completer name
     const completerProfile = project.memberProfiles?.find((m) => m.id === completedBy);
     const completerName = completerProfile?.displayName || "Someone";
 
-    const message = {
-      notification: {
-        title: `${project.emoji} ${project.name}`,
-        body: `${completerName} 完成了任务: ${after.emoji} ${after.title} ✅`,
+    const sent = await sendLocalizedNotification({
+      uids: recipientIds,
+      title: `${project.emoji} ${project.name}`,
+      bodyKey: "due_completed_body",
+      params: {
+        completer: completerName,
+        emoji: after.emoji,
+        title: after.title,
       },
-      data: {
+      dataPayload: {
         type: "due_completed",
         projectId: projectId,
         dueId: event.params.dueId,
       },
-    };
-
-    await sendToTokens(tokens, message);
-    console.log(`[DueCompleted] Notified ${tokens.length} members for ${after.title}`);
+    });
+    console.log(`[DueCompleted] Notified ${sent} members for ${after.title}`);
   }
 );
 
@@ -99,21 +363,20 @@ exports.onProjectInviteSent = onDocumentCreated(
     const invite = event.data.data();
     const userId = event.params.userId;
 
-    const tokens = await getFCMTokens([userId]);
-    if (tokens.length === 0) return;
-
-    const message = {
-      notification: {
-        title: "项目邀请",
-        body: `${invite.inviterName} 邀请你加入 ${invite.projectEmoji} ${invite.projectName}`,
+    await sendLocalizedNotification({
+      uids: [userId],
+      titleKey: "project_invite_title",
+      bodyKey: "project_invite_body",
+      params: {
+        inviter: invite.inviterName,
+        emoji: invite.projectEmoji,
+        project: invite.projectName,
       },
-      data: {
+      dataPayload: {
         type: "project_invite",
         projectId: invite.projectId,
       },
-    };
-
-    await sendToTokens(tokens, message);
+    });
     console.log(`[Invite] Notified ${userId.substring(0, 8)}... for ${invite.projectName}`);
   }
 );
@@ -139,21 +402,18 @@ exports.onProjectMemberJoined = onDocumentUpdated(
 
     // Notify existing members (not the new one)
     const existingMemberIds = before.memberIds;
-    const tokens = await getFCMTokens(existingMemberIds);
-    if (tokens.length === 0) return;
+    if (existingMemberIds.length === 0) return;
 
-    const message = {
-      notification: {
-        title: `${after.emoji} ${after.name}`,
-        body: `${newMemberName} 加入了项目 🎉`,
-      },
-      data: {
+    await sendLocalizedNotification({
+      uids: existingMemberIds,
+      title: `${after.emoji} ${after.name}`,
+      bodyKey: "member_joined_body",
+      params: { name: newMemberName },
+      dataPayload: {
         type: "member_joined",
         projectId: event.params.projectId,
       },
-    };
-
-    await sendToTokens(tokens, message);
+    });
     console.log(`[MemberJoined] ${newMemberName} joined ${after.name}`);
   }
 );
@@ -167,20 +427,18 @@ exports.onFriendRequestSent = onDocumentCreated(
     const request = event.data.data();
     const userId = event.params.userId;
 
-    const tokens = await getFCMTokens([userId]);
-    if (tokens.length === 0) return;
-
-    const message = {
-      notification: {
-        title: "好友请求",
-        body: `${request.fromName} ${request.fromEmoji || ""} 想要添加你为好友`,
+    await sendLocalizedNotification({
+      uids: [userId],
+      titleKey: "friend_request_title",
+      bodyKey: "friend_request_body",
+      params: {
+        name: request.fromName,
+        emoji: request.fromEmoji || "",
       },
-      data: {
+      dataPayload: {
         type: "friend_request",
       },
-    };
-
-    await sendToTokens(tokens, message);
+    });
     console.log(`[FriendRequest] Notified ${userId.substring(0, 8)}... from ${request.fromName}`);
   }
 );
@@ -223,59 +481,58 @@ exports.scheduledDeadlineReminder = onSchedule(
         const due = dueDoc.data();
         const dueDate = due.dueDate.toDate();
 
+        // Pick the right localized body key + days param based on urgency.
+        // The string itself is materialized per-receiver inside
+        // sendLocalizedNotification so each member gets their own locale.
         let urgency = null;
-        let body = null;
+        let bodyKey = null;
+        let days = 0;
 
-        // Overdue
         if (dueDate < now) {
           urgency = "deadline_overdue";
-          const daysOverdue = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
-          body = `${due.emoji} ${due.title} 已逾期 ${daysOverdue} 天！`;
-        }
-        // Due today
-        else if (dueDate < tomorrow) {
+          bodyKey = "due_overdue_body";
+          days = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
+        } else if (dueDate < tomorrow) {
           urgency = "deadline_approaching";
-          body = `${due.emoji} ${due.title} 今天截止！`;
-        }
-        // Due within 3 days
-        else if (dueDate < in3Days) {
+          bodyKey = "due_today_body";
+        } else if (dueDate < in3Days) {
           urgency = "deadline_approaching";
-          const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-          body = `${due.emoji} ${due.title} 还有 ${daysLeft} 天截止`;
+          bodyKey = "due_approaching_body";
+          days = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
         }
 
-        if (!urgency || !body) continue;
+        if (!urgency || !bodyKey) continue;
 
         // Determine who to notify
         let recipientIds;
         if (Array.isArray(due.assignedTo) && due.assignedTo.length > 0) {
           // Notify all assigned people
           recipientIds = due.assignedTo;
-        } else if (typeof due.assignedTo === 'string') {
+        } else if (typeof due.assignedTo === "string") {
           // Legacy single-assign format
           recipientIds = [due.assignedTo];
         } else {
           // Notify all members
           recipientIds = project.memberIds;
         }
+        if (!recipientIds || recipientIds.length === 0) continue;
 
-        const tokens = await getFCMTokens(recipientIds);
-        if (tokens.length === 0) continue;
-
-        const message = {
-          notification: {
-            title: `${project.emoji} ${project.name}`,
-            body: body,
+        const sent = await sendLocalizedNotification({
+          uids: recipientIds,
+          title: `${project.emoji} ${project.name}`,  // user content
+          bodyKey: bodyKey,
+          params: {
+            emoji: due.emoji,
+            title: due.title,
+            days: days,
           },
-          data: {
+          dataPayload: {
             type: urgency,
             projectId: projectDoc.id,
             dueId: dueDoc.id,
           },
-        };
-
-        await sendToTokens(tokens, message);
-        notificationCount++;
+        });
+        if (sent > 0) notificationCount++;
       }
     }
 
@@ -295,13 +552,18 @@ exports.onNudgeSent = onDocumentCreated(
     const senderName = nudge.fromName || "Someone";
     const senderEmoji = nudge.fromEmoji || "👋";
 
-    // 1) Send nudge notification to receiver
+    // 1) Send nudge notification to receiver in their preferred locale.
+    const receiverDoc = await db.collection("users").doc(receiverUid).get();
+    const receiverData = receiverDoc.exists ? receiverDoc.data() : null;
+    const receiverLocale = localeFromDoc(receiverData);
     const receiverTokens = await getFCMTokens([receiverUid]);
     if (receiverTokens.length > 0) {
       const receiverMessage = {
         notification: {
-          title: "拍一拍 👋",
-          body: `${senderEmoji} ${senderName} 拍了拍你`,
+          title: localize("nudge_received_title", receiverLocale),
+          body: localize("nudge_received_body", receiverLocale, {
+            emoji: senderEmoji, name: senderName,
+          }),
         },
         data: {
           type: "nudge_received",
@@ -309,22 +571,22 @@ exports.onNudgeSent = onDocumentCreated(
       };
       const result = await sendToTokens(receiverTokens, receiverMessage);
 
-      // 2) If successfully delivered, confirm to sender
+      // 2) If successfully delivered, confirm to sender in THEIR locale
+      // (likely different from receiver's — eg sender ja, receiver zh).
       if (result > 0) {
-        const receiverDoc = await db.collection("users").doc(receiverUid).get();
-        const receiverName = receiverDoc.exists
-          ? receiverDoc.data().displayName || "对方"
-          : "对方";
-        const receiverEmoji = receiverDoc.exists
-          ? receiverDoc.data().avatarEmoji || ""
-          : "";
+        const senderLocale = await fetchLocale(senderUid);
+        const receiverName = receiverData?.displayName
+          || localize("friend_fallback", senderLocale);
+        const receiverEmoji = receiverData?.avatarEmoji || "";
 
         const senderTokens = await getFCMTokens([senderUid]);
         if (senderTokens.length > 0) {
           const confirmMessage = {
             notification: {
-              title: "拍一拍已送达 ✅",
-              body: `${receiverEmoji} ${receiverName} 已收到你的拍一拍`,
+              title: localize("nudge_delivered_title", senderLocale),
+              body: localize("nudge_delivered_body", senderLocale, {
+                emoji: receiverEmoji, name: receiverName,
+              }),
             },
             data: {
               type: "nudge_delivered",
@@ -351,13 +613,18 @@ exports.onRingNudgeSent = onDocumentCreated(
     const senderName = nudge.fromName || "Someone";
     const senderEmoji = nudge.fromEmoji || "🔔";
 
-    // 1) Send critical notification to receiver (rings the phone)
+    // 1) Send critical notification to receiver in their locale.
+    const receiverDoc = await db.collection("users").doc(receiverUid).get();
+    const receiverData = receiverDoc.exists ? receiverDoc.data() : null;
+    const receiverLocale = localeFromDoc(receiverData);
     const receiverTokens = await getFCMTokens([receiverUid]);
     if (receiverTokens.length > 0) {
       const receiverMessage = {
         notification: {
-          title: "响铃拍一拍 🔔",
-          body: `${senderEmoji} ${senderName} 响铃拍了拍你！`,
+          title: localize("ring_nudge_received_title", receiverLocale),
+          body: localize("ring_nudge_received_body", receiverLocale, {
+            emoji: senderEmoji, name: senderName,
+          }),
         },
         data: {
           type: "ring_nudge_received",
@@ -376,19 +643,20 @@ exports.onRingNudgeSent = onDocumentCreated(
       };
       const result = await sendToTokens(receiverTokens, receiverMessage);
 
-      // 2) If successfully delivered, confirm to sender
+      // 2) If successfully delivered, confirm to sender in THEIR locale.
       if (result > 0) {
-        const receiverDoc = await db.collection("users").doc(receiverUid).get();
-        const receiverName = receiverDoc.exists
-          ? receiverDoc.data().displayName || "对方"
-          : "对方";
+        const senderLocale = await fetchLocale(senderUid);
+        const receiverName = receiverData?.displayName
+          || localize("friend_fallback", senderLocale);
 
         const senderTokens = await getFCMTokens([senderUid]);
         if (senderTokens.length > 0) {
           const confirmMessage = {
             notification: {
-              title: "响铃已送达 🔔",
-              body: `${receiverName} 的手机已响铃`,
+              title: localize("ring_nudge_delivered_title", senderLocale),
+              body: localize("ring_nudge_delivered_body", senderLocale, {
+                name: receiverName,
+              }),
             },
             data: {
               type: "ring_nudge_delivered",
