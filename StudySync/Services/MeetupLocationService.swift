@@ -10,6 +10,14 @@ import ActivityKit
 final class MeetupLocationService: NSObject {
     static let shared = MeetupLocationService()
 
+    /// A meetup is considered "stale" this long after its `meetupTime`.
+    /// Beyond this window the Live Activity auto-ends and the project
+    /// listener calls `endMeetup()` to clean up Firestore. Six hours is
+    /// generous enough for most real-world events (dinner, study sesh,
+    /// movie night) while still preventing perpetual ghost activities
+    /// when nobody remembered to tap "End meetup".
+    static let autoEndDelay: TimeInterval = 6 * 3600
+
     // Published state
     var currentLocation: CLLocation?
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -222,6 +230,15 @@ final class MeetupLocationService: NSObject {
 
     private func updateLiveActivity(etas: AllETAs) {
         guard let activity = meetupActivity, let meetupTime else { return }
+
+        // Self-end if we're past the auto-end window. Otherwise the
+        // activity could keep updating (and showing on the lock screen
+        // for up to 8h per ActivityKit's max display duration) long
+        // after the meetup has logically ended.
+        if Date().timeIntervalSince(meetupTime) > Self.autoEndDelay {
+            endLiveActivity()
+            return
+        }
 
         let remaining = Int(meetupTime.timeIntervalSinceNow)
 

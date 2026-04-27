@@ -146,22 +146,23 @@ struct MeetupLiveActivity: Widget {
 
 /// Live Activity lock-screen view for an upcoming meetup.
 ///
-/// Earlier versions used a `Map` view as the background, but ActivityKit's
-/// lock-screen presentation only renders a small whitelist of views — Map
-/// is silently skipped on real devices and the system falls back to a
-/// muddy yellow-gold gradient (filed as the visible "broken background"
-/// bug). We now ship a static gradient + decorative `mappin` glyph keyed
-/// off the meetup state so the design stays on-brand without violating
-/// the whitelist.
+/// History note: earlier versions tried a `Map` as the background, but
+/// ActivityKit's lock-screen presentation only renders a small whitelist
+/// of views — Map is silently skipped and the system falls back to a
+/// muddy yellow-gold default (the "broken background" bug). The follow-up
+/// gradient version was on-brand but legibility suffered against pink /
+/// orange backgrounds on the lock screen. We now ship a flat dark surface
+/// (matches the widget aesthetic of DueCountdownLiveActivity) with a
+/// thin colour bar on the leading edge that carries the status signal.
 struct MeetupLockScreenView: View {
     let context: ActivityViewContext<MeetupActivityAttributes>
 
-    /// Status drives the background tint. Three buckets so the user can
-    /// glance and immediately tell whether the meetup is upcoming, about
-    /// to start, or already past the meetup time.
+    /// Status drives the leading status bar colour. Three buckets so the
+    /// user can glance and immediately tell whether the meetup is
+    /// upcoming, about to start, or already past the meetup time.
     private enum Phase {
-        case upcoming      // plenty of time, on-brand pink/magenta
-        case shouldLeave   // should-leave-now warning, amber/red
+        case upcoming      // plenty of time, on-brand pink
+        case shouldLeave   // should-leave-now warning, amber
         case arrivedTime   // meetup time reached, green
     }
 
@@ -171,35 +172,31 @@ struct MeetupLockScreenView: View {
         return .upcoming
     }
 
-    private var bgGradient: LinearGradient {
-        let colors: [Color]
+    /// Status indicator colour — used for the leading bar and the small
+    /// title-row pin glyph. Saturated colours read fine on the dark
+    /// surface; the rest of the content stays white for max legibility.
+    private var statusColor: Color {
         switch phase {
-        case .upcoming:
-            // Brand pink → deep magenta. Echoes the #FF6B9D meetup pin
-            // colour we use everywhere else (event card, map marker).
-            colors = [Color(hex: "#FF6B9D"), Color(hex: "#7C2D5A")]
-        case .shouldLeave:
-            colors = [Color(hex: "#F97316"), Color(hex: "#7C2D12")]
-        case .arrivedTime:
-            colors = [Color(hex: "#10B981"), Color(hex: "#064E3B")]
+        case .upcoming:    return Color(hex: "#FF6B9D")  // brand pink
+        case .shouldLeave: return Color(hex: "#F97316")  // amber
+        case .arrivedTime: return Color(hex: "#10B981")  // green
         }
-        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     var body: some View {
         ZStack {
-            bgGradient
+            // Flat dark surface — easy to read on both light & dark lock
+            // screens, no gradient noise. Matches Apple's own Maps and
+            // Find My Live Activities.
+            Color(hex: "#1C1C1E")
 
-            // Decorative oversized mappin in the bottom-trailing corner.
-            // Negative offset pushes most of the glyph off-screen so it
-            // reads as a watermark rather than a foreground element —
-            // gives the card visual depth without competing with the
-            // countdown text.
-            Image(systemName: "mappin.and.ellipse")
-                .font(.system(size: 140, weight: .light))
-                .foregroundStyle(.white.opacity(0.08))
-                .offset(x: 90, y: 30)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            // Leading 4pt colour bar carries the urgency signal.
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(statusColor)
+                    .frame(width: 4)
+                Spacer(minLength: 0)
+            }
 
             // Content
             VStack(spacing: 10) {
@@ -207,14 +204,14 @@ struct MeetupLockScreenView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.subheadline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(statusColor)
                     Text(context.attributes.meetupTitle)
                         .font(.subheadline.bold())
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(context.attributes.placeName)
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                 }
 
@@ -226,12 +223,12 @@ struct MeetupLockScreenView: View {
                         Text("该出发了!")
                             .font(.caption.bold())
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "#F97316"))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(.white.opacity(0.2))
+                            .fill(Color(hex: "#F97316").opacity(0.18))
                     )
                 }
 
@@ -242,28 +239,30 @@ struct MeetupLockScreenView: View {
                         if context.attributes.meetupTime > Date.now {
                             Text(timerInterval: Date.now...context.attributes.meetupTime, countsDown: true)
                                 .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(.white)
+                                .foregroundStyle(phase == .shouldLeave ? statusColor : .white)
                         } else {
                             Text("已到达集合时间")
                                 .font(.headline.bold())
-                                .foregroundStyle(.white)
+                                .foregroundStyle(statusColor)
                         }
                         Text("集合 \(context.attributes.meetupTime, format: .dateTime.hour().minute())")
                             .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white.opacity(0.55))
                     }
 
                     Spacer()
 
                     // Right: 3 compact ETAs
                     HStack(spacing: 14) {
-                        etaCompact(icon: "car.fill", seconds: context.state.etaDrivingSeconds)
-                        etaCompact(icon: "bus.fill", seconds: context.state.etaTransitSeconds)
-                        etaCompact(icon: "figure.walk", seconds: context.state.etaWalkingSeconds)
+                        etaCompact(icon: "car.fill", seconds: context.state.etaDrivingSeconds, color: Color(hex: "#5AC8FA"))
+                        etaCompact(icon: "bus.fill", seconds: context.state.etaTransitSeconds, color: Color(hex: "#34C759"))
+                        etaCompact(icon: "figure.walk", seconds: context.state.etaWalkingSeconds, color: Color(hex: "#FF9F0A"))
                     }
                 }
             }
-            .padding(14)
+            .padding(.leading, 16)   // extra to clear the 4pt status bar
+            .padding(.trailing, 14)
+            .padding(.vertical, 14)
             .foregroundStyle(.white)
         }
         .widgetURL(URL(string: "studysync://project"))
@@ -271,22 +270,21 @@ struct MeetupLockScreenView: View {
 
     // MARK: - Compact ETA
 
-    /// Single ETA cell. We render in white-on-gradient (instead of the
-    /// per-mode tint we used to use) because the background colour is
-    /// already carrying the urgency signal — coloured glyphs on a coloured
-    /// background washed out badly under the lock-screen render path.
-    private func etaCompact(icon: String, seconds: Int?) -> some View {
+    /// Single ETA cell. Glyph carries the per-mode tint (cyan / green /
+    /// orange) — these read fine on the flat dark surface, unlike the
+    /// previous gradient design where coloured glyphs washed out.
+    private func etaCompact(icon: String, seconds: Int?, color: Color) -> some View {
         VStack(spacing: 2) {
             Image(systemName: icon)
                 .font(.system(size: 13))
-                .foregroundStyle(seconds != nil ? .white : .white.opacity(0.4))
+                .foregroundStyle(seconds != nil ? color : .white.opacity(0.35))
             if let seconds {
                 Text(formatETA(seconds))
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
             } else {
                 Text("--")
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.35))
             }
         }
     }

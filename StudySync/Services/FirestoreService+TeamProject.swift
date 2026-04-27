@@ -370,6 +370,24 @@ extension FirestoreService {
         }
     }
 
+    /// Snapshot the meetup into `projects/{projectId}/meetupHistory/{meetupId}`
+    /// before clearing `activeMeetup`. Lets the project history view show a
+    /// timeline of past meetups (place, time, attendees) and tells us whether
+    /// each one was wrapped up manually or auto-ended after the 6h grace
+    /// window expired.
+    func archiveMeetup(projectId: String, meetup: MeetupSession, autoEnded: Bool) async {
+        do {
+            var data = try Firestore.Encoder().encode(meetup)
+            data["endedAt"] = Date()
+            data["endReason"] = autoEnded ? "auto_timeout" : "manual"
+            try await db.collection("projects").document(projectId)
+                .collection("meetupHistory").document(meetup.id)
+                .setData(data, merge: true)
+        } catch {
+            debugPrint("[Firestore] archiveMeetup error: \(error)")
+        }
+    }
+
     func updateMeetupDetails(projectId: String, title: String, meetupTime: Date, placeName: String, placeAddress: String, latitude: Double, longitude: Double) async {
         do {
             try await db.collection("projects").document(projectId)

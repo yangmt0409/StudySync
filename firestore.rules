@@ -215,6 +215,14 @@ service cloud.firestore {
         allow delete: if request.auth != null;
       }
 
+      // Meetup history archive - members read, any authed user can write
+      // (the device that detects the 6h timeout writes the snapshot, and
+      // any project member could be that device).
+      match /meetupHistory/{meetupId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+
       // Project activity log - members can read, authed can create
       match /activities/{activityId} {
         allow read: if request.auth != null;

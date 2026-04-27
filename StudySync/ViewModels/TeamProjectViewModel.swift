@@ -298,6 +298,17 @@ final class TeamProjectViewModel {
             let oldMeetup = self.currentProject?.activeMeetup
             self.currentProject = updated
 
+            // Auto-archive stale meetups. If `meetupTime` was more than
+            // `MeetupLocationService.autoEndDelay` (6h) ago and nobody
+            // tapped "End meetup", clean it up now. We tag the activity
+            // log with `auto` so the post-mortem reads "ended
+            // automatically" instead of pretending a member did it.
+            if let meetup = updated.activeMeetup,
+               Date().timeIntervalSince(meetup.meetupTime) > MeetupLocationService.autoEndDelay {
+                Task { [weak self] in await self?.autoEndMeetup(meetup) }
+                return
+            }
+
             // Meetup ended externally (another member ended it)
             if hadMeetup && updated.activeMeetup == nil {
                 MeetupLocationService.shared.stopTracking()
@@ -600,11 +611,38 @@ final class TeamProjectViewModel {
     }
 
     func endMeetup() async {
-        guard let projectId = currentProject?.id else { return }
+        guard let projectId = currentProject?.id,
+              let meetup = currentProject?.activeMeetup else {
+            // Fallback: if for some reason we don't have the meetup snapshot
+            // (e.g. listener race), still try to clear the field so a stale
+            // doc doesn't lock the UI in meetup mode forever.
+            if let projectId = currentProject?.id {
+                MeetupLocationService.shared.stopTracking()
+                await firestore.endMeetup(projectId: projectId)
+                stopMeetupLocationsListener()
+            }
+            return
+        }
         MeetupLocationService.shared.stopTracking()
+        await firestore.archiveMeetup(projectId: projectId, meetup: meetup, autoEnded: false)
         await firestore.endMeetup(projectId: projectId)
         stopMeetupLocationsListener()
-        logActivity(type: .meetupEnded)
+        logActivity(type: .meetupEnded, detail: "\(meetup.title) @ \(meetup.placeName)")
+    }
+
+    /// Listener-triggered auto-end after the meetup has been past its
+    /// `meetupTime` for more than `MeetupLocationService.autoEndDelay`.
+    /// This runs on whichever device picks up the change first; the
+    /// resulting `activeMeetup = nil` write fans out to other members
+    /// through the same listener and they self-cleanup their Live
+    /// Activity in the `hadMeetup && updated.activeMeetup == nil` branch.
+    private func autoEndMeetup(_ meetup: MeetupSession) async {
+        guard let projectId = currentProject?.id else { return }
+        MeetupLocationService.shared.stopTracking()
+        await firestore.archiveMeetup(projectId: projectId, meetup: meetup, autoEnded: true)
+        await firestore.endMeetup(projectId: projectId)
+        stopMeetupLocationsListener()
+        logActivity(type: .meetupEnded, detail: "\(meetup.title) @ \(meetup.placeName) (自动结束)")
     }
 
     var isInMeetup: Bool {
