@@ -1,7 +1,6 @@
 import ActivityKit
 import WidgetKit
 import SwiftUI
-import MapKit
 
 // MARK: - Shared Attributes (must match main app)
 
@@ -145,143 +144,126 @@ struct MeetupLiveActivity: Widget {
 
 // MARK: - Lock Screen View
 
+/// Live Activity lock-screen view for an upcoming meetup.
+///
+/// Earlier versions used a `Map` view as the background, but ActivityKit's
+/// lock-screen presentation only renders a small whitelist of views — Map
+/// is silently skipped on real devices and the system falls back to a
+/// muddy yellow-gold gradient (filed as the visible "broken background"
+/// bug). We now ship a static gradient + decorative `mappin` glyph keyed
+/// off the meetup state so the design stays on-brand without violating
+/// the whitelist.
 struct MeetupLockScreenView: View {
     let context: ActivityViewContext<MeetupActivityAttributes>
 
-    private var destCoord: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(
-            latitude: context.attributes.destLatitude,
-            longitude: context.attributes.destLongitude
-        )
+    /// Status drives the background tint. Three buckets so the user can
+    /// glance and immediately tell whether the meetup is upcoming, about
+    /// to start, or already past the meetup time.
+    private enum Phase {
+        case upcoming      // plenty of time, on-brand pink/magenta
+        case shouldLeave   // should-leave-now warning, amber/red
+        case arrivedTime   // meetup time reached, green
     }
 
-    private var userCoord: CLLocationCoordinate2D? {
-        guard let lat = context.state.userLatitude,
-              let lng = context.state.userLongitude else { return nil }
-        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    private var phase: Phase {
+        if context.attributes.meetupTime <= Date.now { return .arrivedTime }
+        if context.state.shouldLeaveNow { return .shouldLeave }
+        return .upcoming
     }
 
-    private var mapPosition: MapCameraPosition {
-        if let userCoord {
-            let midLat = (userCoord.latitude + destCoord.latitude) / 2
-            let midLng = (userCoord.longitude + destCoord.longitude) / 2
-            let latDelta = max(abs(userCoord.latitude - destCoord.latitude) * 1.6, 0.012)
-            let lngDelta = max(abs(userCoord.longitude - destCoord.longitude) * 1.6, 0.012)
-            return .region(MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: midLat, longitude: midLng),
-                span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta)
-            ))
-        } else {
-            return .region(MKCoordinateRegion(
-                center: destCoord,
-                latitudinalMeters: 3000,
-                longitudinalMeters: 3000
-            ))
+    private var bgGradient: LinearGradient {
+        let colors: [Color]
+        switch phase {
+        case .upcoming:
+            // Brand pink → deep magenta. Echoes the #FF6B9D meetup pin
+            // colour we use everywhere else (event card, map marker).
+            colors = [Color(hex: "#FF6B9D"), Color(hex: "#7C2D5A")]
+        case .shouldLeave:
+            colors = [Color(hex: "#F97316"), Color(hex: "#7C2D12")]
+        case .arrivedTime:
+            colors = [Color(hex: "#10B981"), Color(hex: "#064E3B")]
         }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     var body: some View {
         ZStack {
-            // Map background — full bleed
-            Map(initialPosition: mapPosition, interactionModes: []) {
-                Marker(context.attributes.placeName, systemImage: "mappin.circle.fill", coordinate: destCoord)
-                    .tint(Color(hex: "#FF6B9D"))
+            bgGradient
 
-                if let userCoord {
-                    Annotation("", coordinate: userCoord) {
-                        ZStack {
-                            Circle()
-                                .fill(.blue.opacity(0.25))
-                                .frame(width: 24, height: 24)
-                            Circle()
-                                .fill(.blue)
-                                .frame(width: 10, height: 10)
-                                .overlay(Circle().stroke(.white, lineWidth: 2))
-                        }
-                    }
+            // Decorative oversized mappin in the bottom-trailing corner.
+            // Negative offset pushes most of the glyph off-screen so it
+            // reads as a watermark rather than a foreground element —
+            // gives the card visual depth without competing with the
+            // countdown text.
+            Image(systemName: "mappin.and.ellipse")
+                .font(.system(size: 140, weight: .light))
+                .foregroundStyle(.white.opacity(0.08))
+                .offset(x: 90, y: 30)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+
+            // Content
+            VStack(spacing: 10) {
+                // Title + place
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                    Text(context.attributes.meetupTitle)
+                        .font(.subheadline.bold())
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(context.attributes.placeName)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(1)
                 }
-            }
-            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
 
-            // Dark gradient overlay — clear at top, dark at bottom
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .clear, location: 0.15),
-                    .init(color: .black.opacity(0.45), location: 0.45),
-                    .init(color: .black.opacity(0.85), location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+                // Should leave now banner
+                if context.state.shouldLeaveNow && phase != .arrivedTime {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                        Text("该出发了!")
+                            .font(.caption.bold())
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(.white.opacity(0.2))
+                    )
+                }
 
-            // Content pinned to bottom
-            VStack {
-                Spacer()
-
-                VStack(spacing: 8) {
-                    // Title + place
-                    HStack(spacing: 6) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color(hex: "#FF6B9D"))
-                        Text(context.attributes.meetupTitle)
-                            .font(.subheadline.bold())
-                            .lineLimit(1)
-                        Spacer()
-                        Text(context.attributes.placeName)
+                // Countdown + 3 ETAs
+                HStack(alignment: .center) {
+                    // Left: countdown + meetup time
+                    VStack(alignment: .leading, spacing: 2) {
+                        if context.attributes.meetupTime > Date.now {
+                            Text(timerInterval: Date.now...context.attributes.meetupTime, countsDown: true)
+                                .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("已到达集合时间")
+                                .font(.headline.bold())
+                                .foregroundStyle(.white)
+                        }
+                        Text("集合 \(context.attributes.meetupTime, format: .dateTime.hour().minute())")
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.7))
-                            .lineLimit(1)
                     }
 
-                    // Should leave now banner
-                    if context.state.shouldLeaveNow {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption2)
-                            Text("该出发了!")
-                                .font(.caption.bold())
-                        }
-                        .foregroundStyle(.orange)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(.orange.opacity(0.2))
-                        )
-                    }
+                    Spacer()
 
-                    // Countdown + 3 ETAs
-                    HStack(alignment: .center) {
-                        // Left: countdown + meetup time
-                        VStack(alignment: .leading, spacing: 2) {
-                            if context.attributes.meetupTime > Date.now {
-                                Text(timerInterval: Date.now...context.attributes.meetupTime, countsDown: true)
-                                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                                    .foregroundStyle(context.state.shouldLeaveNow ? .orange : .white)
-                            } else {
-                                Text("已到达集合时间")
-                                    .font(.headline)
-                                    .foregroundStyle(.green)
-                            }
-                            Text("集合 \(context.attributes.meetupTime, format: .dateTime.hour().minute())")
-                                .font(.caption2)
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
-
-                        Spacer()
-
-                        // Right: 3 compact ETAs
-                        HStack(spacing: 14) {
-                            etaCompact(icon: "car.fill", seconds: context.state.etaDrivingSeconds, color: .cyan)
-                            etaCompact(icon: "bus.fill", seconds: context.state.etaTransitSeconds, color: .green)
-                            etaCompact(icon: "figure.walk", seconds: context.state.etaWalkingSeconds, color: .orange)
-                        }
+                    // Right: 3 compact ETAs
+                    HStack(spacing: 14) {
+                        etaCompact(icon: "car.fill", seconds: context.state.etaDrivingSeconds)
+                        etaCompact(icon: "bus.fill", seconds: context.state.etaTransitSeconds)
+                        etaCompact(icon: "figure.walk", seconds: context.state.etaWalkingSeconds)
                     }
                 }
-                .padding(14)
             }
+            .padding(14)
             .foregroundStyle(.white)
         }
         .widgetURL(URL(string: "studysync://project"))
@@ -289,18 +271,22 @@ struct MeetupLockScreenView: View {
 
     // MARK: - Compact ETA
 
-    private func etaCompact(icon: String, seconds: Int?, color: Color) -> some View {
+    /// Single ETA cell. We render in white-on-gradient (instead of the
+    /// per-mode tint we used to use) because the background colour is
+    /// already carrying the urgency signal — coloured glyphs on a coloured
+    /// background washed out badly under the lock-screen render path.
+    private func etaCompact(icon: String, seconds: Int?) -> some View {
         VStack(spacing: 2) {
             Image(systemName: icon)
                 .font(.system(size: 13))
-                .foregroundStyle(seconds != nil ? color : .white.opacity(0.35))
+                .foregroundStyle(seconds != nil ? .white : .white.opacity(0.4))
             if let seconds {
                 Text(formatETA(seconds))
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
             } else {
                 Text("--")
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.white.opacity(0.4))
             }
         }
     }
