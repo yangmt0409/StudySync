@@ -18,6 +18,11 @@ final class MeetupLocationService: NSObject {
     var myDrivingETA: Int?         // latest driving ETA (local, instant)
     var myTransitETA: Int?         // latest transit ETA (local, instant)
     var myWalkingETA: Int?         // latest walking ETA (local, instant)
+    /// Set true after the FIRST successful Firestore write since `startTracking`.
+    /// Used by the location delegate to detect "we have a fix but never managed
+    /// to upload yet" — kicks off an immediate upload on the next valid fix
+    /// instead of waiting up to 30 s for the periodic timer.
+    private var didCompleteFirstUpload = false
 
     // Private
     private let locationManager = CLLocationManager()
@@ -72,6 +77,7 @@ final class MeetupLocationService: NSObject {
         self.meetupTitle = meetupTitle
         self.placeName = placeName
         isTracking = true
+        didCompleteFirstUpload = false
 
         locationManager.startUpdatingLocation()
 
@@ -90,6 +96,7 @@ final class MeetupLocationService: NSObject {
 
     func stopTracking() {
         isTracking = false
+        didCompleteFirstUpload = false
         locationManager.stopUpdatingLocation()
         uploadTimer?.invalidate()
         uploadTimer = nil
@@ -165,6 +172,7 @@ final class MeetupLocationService: NSObject {
                 updatedAt: Date()
             )
             await firestore.updateMeetupLocation(projectId: projectId, location: memberLocation)
+            await MainActor.run { self.didCompleteFirstUpload = true }
         }
     }
 
@@ -351,6 +359,19 @@ extension MeetupLocationService: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        let prev = currentLocation
         currentLocation = locations.last
+
+        // First-fix fast path: the periodic upload timer fires every 30s and
+        // the initial 2s `asyncAfter` upload often misses cold-start GPS
+        // fixes (indoors, weak signal, just-launched app). If we never
+        // managed to push a row to Firestore yet, kick off an upload as
+        // soon as we have a valid fix — peer devices stop seeing the
+        // empty-state and start seeing the user's ETA chips immediately
+        // instead of waiting up to 30 seconds.
+        // (User-reported: "我跟我朋友都 enable 了但 ETA 没显示".)
+        if isTracking && !didCompleteFirstUpload && prev == nil && currentLocation != nil {
+            uploadLocation()
+        }
     }
 }
