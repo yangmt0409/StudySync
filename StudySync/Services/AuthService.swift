@@ -27,6 +27,10 @@ final class AuthService: NSObject {
     // MARK: - Listen Auth State
 
     func listenAuthState() {
+        // Idempotent — if AppDelegate / SwiftUI app lifecycle calls this
+        // more than once (warm relaunch, scene re-entry), don't stack
+        // multiple Firebase listeners on top of each other.
+        guard authStateHandle == nil else { return }
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             self?.currentUser = user
             if let user {
