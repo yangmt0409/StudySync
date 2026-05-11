@@ -188,6 +188,21 @@ function localize(key, locale, params) {
 }
 
 /**
+ * Sanitize a user-supplied string for inclusion in a push notification.
+ * Strips control characters and clamps the length so a malicious or
+ * malformed client write can't blow up the notification payload or
+ * inject newlines / null bytes into the body. Returns the fallback if
+ * the input is missing, empty after trimming, or wasn't a string.
+ */
+function safeStr(value, fallback = "", maxLen = 80) {
+  if (typeof value !== "string") return fallback;
+  // Strip Unicode control characters (newlines, null bytes, etc.).
+  const cleaned = value.replace(/\p{Cc}/gu, "").trim();
+  if (cleaned.length === 0) return fallback;
+  return cleaned.length > maxLen ? cleaned.slice(0, maxLen) + "…" : cleaned;
+}
+
+/**
  * Read a single user's `locale` field from Firestore. Cached per Cloud
  * Function invocation via passed-in doc when caller already fetched the
  * user. Returns "zh-Hans" if the field is missing.
@@ -279,12 +294,14 @@ async function sendLocalizedNotification({
 exports.onProjectDueCreated = onDocumentCreated(
   "projects/{projectId}/dues/{dueId}",
   async (event) => {
-    const due = event.data.data();
+    const due = event.data?.data();
+    if (!due) return;
     const projectId = event.params.projectId;
 
     const projectDoc = await db.collection("projects").doc(projectId).get();
     if (!projectDoc.exists) return;
     const project = projectDoc.data();
+    if (!Array.isArray(project.memberIds)) return;
 
     // Notify all members except the creator
     const recipientIds = project.memberIds.filter((uid) => uid !== due.createdBy);
@@ -292,12 +309,12 @@ exports.onProjectDueCreated = onDocumentCreated(
 
     const sent = await sendLocalizedNotification({
       uids: recipientIds,
-      title: `${project.emoji} ${project.name}`,  // user content — not localized
+      title: `${safeStr(project.emoji, "")} ${safeStr(project.name, "Project")}`.trim(),
       bodyKey: "due_created_body",
       params: {
-        creator: due.creatorName,
-        emoji: due.emoji,
-        title: due.title,
+        creator: safeStr(due.creatorName, "Someone", 40),
+        emoji: safeStr(due.emoji, "", 8),
+        title: safeStr(due.title, "Untitled", 60),
       },
       dataPayload: {
         type: "due_created",
@@ -305,7 +322,7 @@ exports.onProjectDueCreated = onDocumentCreated(
         dueId: event.params.dueId,
       },
     });
-    console.log(`[DueCreated] Notified ${sent} members for ${due.title}`);
+    console.log(`[DueCreated] Notified ${sent} members`);
   }
 );
 
@@ -315,8 +332,9 @@ exports.onProjectDueCreated = onDocumentCreated(
 exports.onProjectDueCompleted = onDocumentUpdated(
   "projects/{projectId}/dues/{dueId}",
   async (event) => {
-    const before = event.data.before.data();
-    const after = event.data.after.data();
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
 
     // Only trigger when isCompleted changes from false → true
     if (before.isCompleted || !after.isCompleted) return;
@@ -325,6 +343,7 @@ exports.onProjectDueCompleted = onDocumentUpdated(
     const projectDoc = await db.collection("projects").doc(projectId).get();
     if (!projectDoc.exists) return;
     const project = projectDoc.data();
+    if (!Array.isArray(project.memberIds)) return;
 
     // Notify all members except the completer
     const completedBy = after.completedBy;
@@ -332,17 +351,17 @@ exports.onProjectDueCompleted = onDocumentUpdated(
     if (recipientIds.length === 0) return;
 
     // Find completer name
-    const completerProfile = project.memberProfiles?.find((m) => m.id === completedBy);
-    const completerName = completerProfile?.displayName || "Someone";
+    const completerProfile = (project.memberProfiles || []).find((m) => m && m.id === completedBy);
+    const completerName = safeStr(completerProfile?.displayName, "Someone", 40);
 
     const sent = await sendLocalizedNotification({
       uids: recipientIds,
-      title: `${project.emoji} ${project.name}`,
+      title: `${safeStr(project.emoji, "")} ${safeStr(project.name, "Project")}`.trim(),
       bodyKey: "due_completed_body",
       params: {
         completer: completerName,
-        emoji: after.emoji,
-        title: after.title,
+        emoji: safeStr(after.emoji, "", 8),
+        title: safeStr(after.title, "Untitled", 60),
       },
       dataPayload: {
         type: "due_completed",
@@ -350,7 +369,7 @@ exports.onProjectDueCompleted = onDocumentUpdated(
         dueId: event.params.dueId,
       },
     });
-    console.log(`[DueCompleted] Notified ${sent} members for ${after.title}`);
+    console.log(`[DueCompleted] Notified ${sent} members`);
   }
 );
 
@@ -360,7 +379,8 @@ exports.onProjectDueCompleted = onDocumentUpdated(
 exports.onProjectInviteSent = onDocumentCreated(
   "users/{userId}/projectInvites/{inviteId}",
   async (event) => {
-    const invite = event.data.data();
+    const invite = event.data?.data();
+    if (!invite) return;
     const userId = event.params.userId;
 
     await sendLocalizedNotification({
@@ -368,16 +388,16 @@ exports.onProjectInviteSent = onDocumentCreated(
       titleKey: "project_invite_title",
       bodyKey: "project_invite_body",
       params: {
-        inviter: invite.inviterName,
-        emoji: invite.projectEmoji,
-        project: invite.projectName,
+        inviter: safeStr(invite.inviterName, "Someone", 40),
+        emoji: safeStr(invite.projectEmoji, "", 8),
+        project: safeStr(invite.projectName, "a project", 60),
       },
       dataPayload: {
         type: "project_invite",
-        projectId: invite.projectId,
+        projectId: invite.projectId || "",
       },
     });
-    console.log(`[Invite] Notified ${userId.substring(0, 8)}... for ${invite.projectName}`);
+    console.log(`[Invite] Notified user`);
   }
 );
 
@@ -387,8 +407,10 @@ exports.onProjectInviteSent = onDocumentCreated(
 exports.onProjectMemberJoined = onDocumentUpdated(
   "projects/{projectId}",
   async (event) => {
-    const before = event.data.before.data();
-    const after = event.data.after.data();
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+    if (!Array.isArray(before.memberIds) || !Array.isArray(after.memberIds)) return;
 
     // Detect new member: memberIds array grew
     if (after.memberIds.length <= before.memberIds.length) return;
@@ -397,8 +419,12 @@ exports.onProjectMemberJoined = onDocumentUpdated(
     if (newMemberIds.length === 0) return;
 
     // Find new member profiles
-    const newMembers = after.memberProfiles?.filter((m) => newMemberIds.includes(m.id)) || [];
-    const newMemberName = newMembers.map((m) => m.displayName).join(", ") || "New member";
+    const newMembers = (after.memberProfiles || []).filter((m) => m && newMemberIds.includes(m.id));
+    const newMemberName = safeStr(
+      newMembers.map((m) => m.displayName).filter(Boolean).join(", "),
+      "New member",
+      60
+    );
 
     // Notify existing members (not the new one)
     const existingMemberIds = before.memberIds;
@@ -406,7 +432,7 @@ exports.onProjectMemberJoined = onDocumentUpdated(
 
     await sendLocalizedNotification({
       uids: existingMemberIds,
-      title: `${after.emoji} ${after.name}`,
+      title: `${safeStr(after.emoji, "")} ${safeStr(after.name, "Project")}`.trim(),
       bodyKey: "member_joined_body",
       params: { name: newMemberName },
       dataPayload: {
@@ -414,7 +440,7 @@ exports.onProjectMemberJoined = onDocumentUpdated(
         projectId: event.params.projectId,
       },
     });
-    console.log(`[MemberJoined] ${newMemberName} joined ${after.name}`);
+    console.log(`[MemberJoined] new member joined project`);
   }
 );
 
@@ -424,7 +450,8 @@ exports.onProjectMemberJoined = onDocumentUpdated(
 exports.onFriendRequestSent = onDocumentCreated(
   "users/{userId}/friendRequests/{requestId}",
   async (event) => {
-    const request = event.data.data();
+    const request = event.data?.data();
+    if (!request) return;
     const userId = event.params.userId;
 
     await sendLocalizedNotification({
@@ -432,14 +459,14 @@ exports.onFriendRequestSent = onDocumentCreated(
       titleKey: "friend_request_title",
       bodyKey: "friend_request_body",
       params: {
-        name: request.fromName,
-        emoji: request.fromEmoji || "",
+        name: safeStr(request.fromName, "Someone", 40),
+        emoji: safeStr(request.fromEmoji, "", 8),
       },
       dataPayload: {
         type: "friend_request",
       },
     });
-    console.log(`[FriendRequest] Notified ${userId.substring(0, 8)}... from ${request.fromName}`);
+    console.log(`[FriendRequest] Notified user`);
   }
 );
 
@@ -519,11 +546,11 @@ exports.scheduledDeadlineReminder = onSchedule(
 
         const sent = await sendLocalizedNotification({
           uids: recipientIds,
-          title: `${project.emoji} ${project.name}`,  // user content
+          title: `${safeStr(project.emoji, "")} ${safeStr(project.name, "Project")}`.trim(),
           bodyKey: bodyKey,
           params: {
-            emoji: due.emoji,
-            title: due.title,
+            emoji: safeStr(due.emoji, "", 8),
+            title: safeStr(due.title, "Untitled", 60),
             days: days,
           },
           dataPayload: {
@@ -546,11 +573,13 @@ exports.scheduledDeadlineReminder = onSchedule(
 exports.onNudgeSent = onDocumentCreated(
   "users/{receiverUid}/nudges/{nudgeId}",
   async (event) => {
-    const nudge = event.data.data();
+    const nudge = event.data?.data();
+    if (!nudge) return;
     const receiverUid = event.params.receiverUid;
-    const senderUid = nudge.fromUid;
-    const senderName = nudge.fromName || "Someone";
-    const senderEmoji = nudge.fromEmoji || "👋";
+    const senderUid = safeStr(nudge.fromUid, "", 64);
+    if (!senderUid) return;
+    const senderName = safeStr(nudge.fromName, "Someone", 40);
+    const senderEmoji = safeStr(nudge.fromEmoji, "👋", 8);
 
     // 1) Send nudge notification to receiver in their preferred locale.
     const receiverDoc = await db.collection("users").doc(receiverUid).get();
@@ -575,9 +604,9 @@ exports.onNudgeSent = onDocumentCreated(
       // (likely different from receiver's — eg sender ja, receiver zh).
       if (result > 0) {
         const senderLocale = await fetchLocale(senderUid);
-        const receiverName = receiverData?.displayName
+        const receiverName = safeStr(receiverData?.displayName, "", 40)
           || localize("friend_fallback", senderLocale);
-        const receiverEmoji = receiverData?.avatarEmoji || "";
+        const receiverEmoji = safeStr(receiverData?.avatarEmoji, "", 8);
 
         const senderTokens = await getFCMTokens([senderUid]);
         if (senderTokens.length > 0) {
@@ -597,7 +626,7 @@ exports.onNudgeSent = onDocumentCreated(
       }
     }
 
-    console.log(`[Nudge] ${senderName} → ${receiverUid.substring(0, 8)}...`);
+    console.log(`[Nudge] delivered`);
   }
 );
 
@@ -607,11 +636,13 @@ exports.onNudgeSent = onDocumentCreated(
 exports.onRingNudgeSent = onDocumentCreated(
   "users/{receiverUid}/ringNudges/{nudgeId}",
   async (event) => {
-    const nudge = event.data.data();
+    const nudge = event.data?.data();
+    if (!nudge) return;
     const receiverUid = event.params.receiverUid;
-    const senderUid = nudge.fromUid;
-    const senderName = nudge.fromName || "Someone";
-    const senderEmoji = nudge.fromEmoji || "🔔";
+    const senderUid = safeStr(nudge.fromUid, "", 64);
+    if (!senderUid) return;
+    const senderName = safeStr(nudge.fromName, "Someone", 40);
+    const senderEmoji = safeStr(nudge.fromEmoji, "🔔", 8);
 
     // 1) Send critical notification to receiver in their locale.
     const receiverDoc = await db.collection("users").doc(receiverUid).get();
@@ -646,7 +677,7 @@ exports.onRingNudgeSent = onDocumentCreated(
       // 2) If successfully delivered, confirm to sender in THEIR locale.
       if (result > 0) {
         const senderLocale = await fetchLocale(senderUid);
-        const receiverName = receiverData?.displayName
+        const receiverName = safeStr(receiverData?.displayName, "", 40)
           || localize("friend_fallback", senderLocale);
 
         const senderTokens = await getFCMTokens([senderUid]);
@@ -667,7 +698,7 @@ exports.onRingNudgeSent = onDocumentCreated(
       }
     }
 
-    console.log(`[RingNudge] ${senderName} → ${receiverUid.substring(0, 8)}...`);
+    console.log(`[RingNudge] delivered`);
   }
 );
 
@@ -716,8 +747,10 @@ async function sendToTokens(tokens, messageTemplate) {
           errorCode === "messaging/invalid-registration-token" ||
           errorCode === "messaging/registration-token-not-registered"
         ) {
-          console.log(`[FCM] Removing invalid token: ${tokens[idx].substring(0, 20)}...`);
-          // Find user with this token and remove it
+          // Don't log token prefix — FCM tokens are sensitive and a
+          // 20-char prefix is enough material to aid token enumeration
+          // attacks if the logs are ever exposed.
+          console.log(`[FCM] Removing invalid token`);
           removeInvalidToken(tokens[idx]);
         }
       }

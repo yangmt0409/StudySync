@@ -30,10 +30,20 @@ struct SharedModelContainer {
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            // Widget must not crash — fall back to in-memory store
+            // Widget must not crash — fall back to in-memory store.
             debugPrint("[Widget] ❌ ModelContainer failed: \(error). Using in-memory fallback.")
             let inMemory = ModelConfiguration("StudySync", schema: schema, isStoredInMemoryOnly: true)
-            return try! ModelContainer(for: schema, configurations: [inMemory])
+            do {
+                return try ModelContainer(for: schema, configurations: [inMemory])
+            } catch {
+                // Even in-memory failed — last resort, build a container with
+                // an empty schema so the widget renders its placeholder
+                // instead of crashing the entire timeline.
+                debugPrint("[Widget] ❌ in-memory fallback also failed: \(error). Returning empty container.")
+                // swiftlint:disable:next force_try
+                return try! ModelContainer(for: Schema([]),
+                                           configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+            }
         }
     }
 }

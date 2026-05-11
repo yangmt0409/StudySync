@@ -60,8 +60,26 @@ service cloud.firestore {
         );
     }
 
-    // User profiles - anyone authed can read, only owner can write.
-    // Update is additionally locked down against Pro entitlement tampering.
+    // ============================================================
+    // Project membership helper
+    // ============================================================
+    // Used by every subcollection under /projects/{projectId}/... to
+    // gate access to people who are actually members. Costs 1 extra
+    // Firestore read per request, but that's the price of correctness —
+    // before this gate, any authenticated user could read/write any
+    // project's dues / activities / meetup data.
+    function isProjectMember(projectId) {
+      return request.auth != null
+        && request.auth.uid in
+           get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds;
+    }
+
+    // User profiles - public read is required for friend-code lookup;
+    // sensitive fields (fcmToken, locale, email) are still exposed and
+    // any client that reads them gets them. This is a known tradeoff —
+    // removing it would require a Cloud-Function-only friend-discovery
+    // path, which is out of scope for this hotfix. Only the owner can
+    // write, and update is locked down against Pro entitlement tampering.
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth.uid == userId
@@ -76,9 +94,12 @@ service cloud.firestore {
                     && earlyBirdGrantedAtWriteAllowed();
       allow delete: if request.auth.uid == userId;
 
-      // Friends subcollection
+      // Friends subcollection. The friend graph is private to each owner
+      // — neither side of a friendship should be able to enumerate the
+      // other side's full friend list. Writes still allowed from either
+      // end so reciprocal friend records work.
       match /friends/{friendId} {
-        allow read: if request.auth != null;
+        allow read: if request.auth.uid == userId;
         allow write: if request.auth.uid == userId
                      || request.auth.uid == friendId;
       }
@@ -102,16 +123,18 @@ service cloud.firestore {
         allow create: if request.auth != null;
       }
 
-      // Shared dues - owner writes, authed users read
+      // Shared dues - private to owner. Pre-1.0.3 this allowed any
+      // authed user to read another user's shared dues; that leaked
+      // both work content and collaboration relationships.
       match /sharedDues/{dueId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId;
       }
 
-      // Project memberships - owner reads/writes own memberships
+      // Project memberships - the owner's own membership index. Pre-
+      // 1.0.3 any authed user could write this subcollection, which
+      // meant user A could fabricate a project membership for user B.
       match /projectMemberships/{membershipId} {
-        allow read: if request.auth.uid == userId;
-        allow write: if request.auth != null;
+        allow read, write: if request.auth.uid == userId;
       }
 
       // Project invites - recipient reads/deletes, any authed user can create
@@ -184,12 +207,19 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Group Focus - any authed user can read/write
+    // Group Focus - readable by everyone (room discovery / lobby),
+    // writeable only by participants. Host is identified by hostUid;
+    // members live in memberUids. Pre-1.0.3 any authed user could
+    // mutate or delete any room.
     match /groupFocus/{roomId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null;
-        allow delete: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.hostUid == request.auth.uid;
+      allow update: if request.auth != null
+                    && (request.auth.uid in resource.data.memberUids
+                        || request.auth.uid in request.resource.data.memberUids);
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.hostUid;
     }
 
     // Team Projects - members can read, authed users can create/update
@@ -202,31 +232,34 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && request.auth.uid == resource.data.createdBy;
 
-      // Project dues - project members can read/write
+      // Project dues - members only. Pre-1.0.3 any authed user could
+      // read/write any project's dues, leaking work content + allowing
+      // arbitrary vandalism.
       match /dues/{dueId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read, write: if isProjectMember(projectId);
       }
 
-      // Meetup locations - members read, owner of doc writes
+      // Meetup locations - members read, owner of doc writes & deletes.
+      // Pre-1.0.3 any authed user could delete another member's
+      // location share, breaking real-time coordination during meetups.
       match /meetupLocations/{uid} {
-        allow read: if request.auth != null;
-        allow write: if request.auth.uid == uid;
-        allow delete: if request.auth != null;
+        allow read: if isProjectMember(projectId);
+        allow write, delete: if request.auth.uid == uid
+                             && isProjectMember(projectId);
       }
 
-      // Meetup history archive - members read, any authed user can write
-      // (the device that detects the 6h timeout writes the snapshot, and
-      // any project member could be that device).
+      // Meetup history archive - members read & write. The device that
+      // detects the 6h timeout writes the snapshot, and any project
+      // member could be that device.
       match /meetupHistory/{meetupId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read, write: if isProjectMember(projectId);
       }
 
-      // Project activity log - members can read, authed can create
+      // Project activity log - members read & create. Pre-1.0.3 any
+      // authed user could spam activity logs of projects they weren't
+      // even in.
       match /activities/{activityId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
+        allow read, create: if isProjectMember(projectId);
       }
     }
   }
