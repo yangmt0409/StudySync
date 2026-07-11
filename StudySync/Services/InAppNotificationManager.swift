@@ -196,11 +196,22 @@ final class InAppNotificationManager {
     // MARK: - Last Seen Helpers
 
     private func lastSeenKey(_ projectId: String) -> String {
-        "notif_lastSeenDues_\(projectId)"
+        // Namespace by uid so a second account signing in on the same device
+        // doesn't inherit the previous account's "last seen" state (which would
+        // hide or fabricate unread badges across accounts).
+        let uid = Auth.auth().currentUser?.uid ?? "anon"
+        return "notif_lastSeenDues_\(uid)_\(projectId)"
     }
 
     private func lastSeenDate(for projectId: String) -> Date {
         let timestamp = UserDefaults.standard.double(forKey: lastSeenKey(projectId))
-        return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : Date.distantPast
+        if timestamp > 0 { return Date(timeIntervalSince1970: timestamp) }
+        // Migration: builds before the uid namespace wrote a per-project key
+        // with no uid. Fall back to it so existing users don't get every
+        // historical due flagged "new" (distantPast) right after updating.
+        // markProjectDuesSeen writes the namespaced key, so this legacy read
+        // naturally stops mattering after the first visit.
+        let legacy = UserDefaults.standard.double(forKey: "notif_lastSeenDues_\(projectId)")
+        return legacy > 0 ? Date(timeIntervalSince1970: legacy) : Date.distantPast
     }
 }

@@ -42,6 +42,15 @@ struct ProjectActivity: Codable, Identifiable {
         case meetingEnded       = "meeting_ended"
         case meetupCreated      = "meetup_created"
         case meetupEnded        = "meetup_ended"
+        /// Sentinel for an activity type written by a newer client. Decoding
+        /// to this (instead of throwing) keeps the entry in the timeline as a
+        /// generic event rather than silently dropping it.
+        case unknown            = "unknown"
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = ActivityType(rawValue: raw) ?? .unknown
+        }
 
         var icon: String {
             switch self {
@@ -57,6 +66,7 @@ struct ProjectActivity: Codable, Identifiable {
             case .meetingEnded:     return "phone.down.fill"
             case .meetupCreated:    return "mappin.circle.fill"
             case .meetupEnded:      return "mappin.slash"
+            case .unknown:          return "circle.dotted"
             }
         }
 
@@ -74,6 +84,7 @@ struct ProjectActivity: Codable, Identifiable {
             case .meetingEnded:     return "#94A3B8"
             case .meetupCreated:    return "#FF6B9D"
             case .meetupEnded:      return "#94A3B8"
+            case .unknown:          return "#94A3B8"
             }
         }
 
@@ -91,6 +102,7 @@ struct ProjectActivity: Codable, Identifiable {
             case .meetingEnded:     return L10n.activityMeetingEnded(actorName)
             case .meetupCreated:    return L10n.activityMeetupCreated(actorName, detail)
             case .meetupEnded:      return L10n.activityMeetupEnded(actorName)
+            case .unknown:          return actorName
             }
         }
     }

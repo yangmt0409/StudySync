@@ -92,6 +92,14 @@ struct ProjectMember: Codable, Identifiable, Equatable {
 enum ProjectRole: String, Codable {
     case owner
     case member
+
+    // Tolerate unknown roles written by a newer client — decode to `.member`
+    // rather than throwing, which would fail the entire TeamProject decode and
+    // drop the whole project for older clients.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ProjectRole(rawValue: raw) ?? .member
+    }
 }
 
 // MARK: - Project Due
@@ -247,6 +255,13 @@ enum DuePriority: String, Codable, CaseIterable {
     case medium
     case high
 
+    // Tolerate unknown priorities (e.g. a future "critical") → default `.medium`
+    // instead of throwing and dropping the whole due.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = DuePriority(rawValue: raw) ?? .medium
+    }
+
     var displayName: String {
         switch self {
         case .low: return L10n.projectPriorityLow
@@ -313,6 +328,12 @@ enum MeetingPlatform: String, Codable, CaseIterable {
     case teams
     case facetime
     case other
+
+    // Tolerate unknown platforms written by a newer client → `.other`.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = MeetingPlatform(rawValue: raw) ?? .other
+    }
 
     var displayName: String {
         switch self {

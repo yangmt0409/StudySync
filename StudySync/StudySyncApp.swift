@@ -6,6 +6,7 @@ import FirebaseCore
 @main
 struct StudySyncApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     let container: ModelContainer
 
     init() {
@@ -110,6 +111,13 @@ struct StudySyncApp: App {
         AppContainer.shared.register(self.container)
 
         DeadlineBackgroundChecker.shared.registerBackgroundTask()
+
+        // Activate the phone→watch WCSession now — activation is async, so
+        // touching the singleton lazily at first background-sync would find
+        // isPaired/isWatchAppInstalled still unset and silently skip that
+        // first sync. Early activation also lets the watch's own "sync"
+        // request (didReceiveMessage) reach us at any point in the session.
+        _ = PhoneToWatchSync.shared
     }
 
     /// Attempt to open a local-only (no CloudKit) ModelContainer. Returns
@@ -134,5 +142,19 @@ struct StudySyncApp: App {
                 }
         }
         .modelContainer(container)
+        .onChange(of: scenePhase) { _, newPhase in
+            // Widgets are only visible once the app is backgrounded, so this
+            // single hook refreshes them after any CountdownEvent change the
+            // user made this session — without instrumenting every write site.
+            if newPhase == .background {
+                WidgetReloader.reloadAll()
+                // Push the latest countdown events to the paired Apple Watch.
+                // updateApplicationContext delivers even while the watch app
+                // is closed, so backgrounding is the one hook that captures
+                // every edit made this session. (The watch also pulls on its
+                // own launch via a WCSession "sync" message.)
+                PhoneToWatchSync.shared.syncEvents(from: ModelContext(container))
+            }
+        }
     }
 }

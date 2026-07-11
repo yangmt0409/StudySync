@@ -6,6 +6,7 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Query(sort: \CountdownEvent.createdAt, order: .reverse) private var events: [CountdownEvent]
+    @Query private var settingsArray: [UserSettings]
     @Bindable var viewModel: EventViewModel
 
     @State private var hasAppeared = false
@@ -380,7 +381,9 @@ struct HomeView: View {
     // MARK: - Helpers
 
     private var groupedEvents: [(EventCategory, [CountdownEvent])] {
-        viewModel.groupedEvents(events, showExpired: true)
+        // Honor the "显示已过期事件" setting — this was hardcoded to `true`
+        // which made the settings toggle a no-op.
+        viewModel.groupedEvents(events, showExpired: settingsArray.first?.showExpiredEvents ?? true)
     }
 
     /// Resolve any pending deep link targeting this tab. Runs on initial

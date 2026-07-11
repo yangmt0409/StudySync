@@ -136,21 +136,36 @@ extension FirestoreService {
             .collection("projectMemberships").document(projectId)
 
         do {
-            let doc = try await projectRef.getDocument()
-            guard var project = try? doc.data(as: TeamProject.self) else { return }
-
-            // Remove from arrays
-            project.memberIds.removeAll { $0 == uid }
-            let updatedProfiles = project.memberProfiles.filter { $0.id != uid }
-
-            let batch = db.batch()
-            batch.updateData([
-                "memberIds": project.memberIds,
-                "memberProfiles": try Firestore.Encoder().encode(updatedProfiles)
-            ], forDocument: projectRef)
-            batch.deleteDocument(membershipRef)
-
-            try await batch.commit()
+            // Run inside a transaction so the read-filter-write happens against
+            // the freshest doc. A plain read+overwrite let two near-simultaneous
+            // leaves (or a join landing between the read and write) clobber each
+            // other — the last writer resurrected a member who had left, or
+            // dropped a member who had just joined.
+            _ = try await db.runTransaction { transaction, errorPointer in
+                let doc: DocumentSnapshot
+                do {
+                    doc = try transaction.getDocument(projectRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                guard var project = try? doc.data(as: TeamProject.self) else {
+                    // Project is already gone — still drop our membership index.
+                    transaction.deleteDocument(membershipRef)
+                    return nil
+                }
+                project.memberIds.removeAll { $0 == uid }
+                let updatedProfiles = project.memberProfiles.filter { $0.id != uid }
+                let encodedProfiles = (try? updatedProfiles.map {
+                    try Firestore.Encoder().encode($0)
+                }) ?? []
+                transaction.updateData([
+                    "memberIds": project.memberIds,
+                    "memberProfiles": encodedProfiles
+                ], forDocument: projectRef)
+                transaction.deleteDocument(membershipRef)
+                return nil
+            }
         } catch {
             debugPrint("[Firestore] leaveProject error: \(error)")
         }
@@ -388,38 +403,53 @@ extension FirestoreService {
         }
     }
 
-    func updateMeetupDetails(projectId: String, title: String, meetupTime: Date, placeName: String, placeAddress: String, latitude: Double, longitude: Double) async {
+    /// Apply nested `activeMeetup.*` field updates ONLY if the meetup still
+    /// exists. A dot-path write (e.g. "activeMeetup.attendeeIds") that lands
+    /// right after endMeetup() deleted the map would otherwise recreate
+    /// activeMeetup as a *partial* map missing required fields (id/title/...),
+    /// which makes MeetupSession — and therefore the entire TeamProject doc —
+    /// fail to decode. The transaction closes the race with endMeetup.
+    private func updateActiveMeetupIfExists(projectId: String, fields: [String: Any]) async {
+        let ref = db.collection("projects").document(projectId)
         do {
-            try await db.collection("projects").document(projectId)
-                .updateData([
-                    "activeMeetup.title": title,
-                    "activeMeetup.meetupTime": meetupTime,
-                    "activeMeetup.placeName": placeName,
-                    "activeMeetup.placeAddress": placeAddress,
-                    "activeMeetup.placeLatitude": latitude,
-                    "activeMeetup.placeLongitude": longitude
-                ])
+            _ = try await db.runTransaction { transaction, errorPointer in
+                let doc: DocumentSnapshot
+                do {
+                    doc = try transaction.getDocument(ref)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                guard doc.exists, doc.get("activeMeetup") != nil else { return nil }
+                transaction.updateData(fields, forDocument: ref)
+                return nil
+            }
         } catch {
-            debugPrint("[Firestore] updateMeetupDetails error: \(error)")
+            debugPrint("[Firestore] updateActiveMeetupIfExists error: \(error)")
         }
+    }
+
+    func updateMeetupDetails(projectId: String, title: String, meetupTime: Date, placeName: String, placeAddress: String, latitude: Double, longitude: Double) async {
+        await updateActiveMeetupIfExists(projectId: projectId, fields: [
+            "activeMeetup.title": title,
+            "activeMeetup.meetupTime": meetupTime,
+            "activeMeetup.placeName": placeName,
+            "activeMeetup.placeAddress": placeAddress,
+            "activeMeetup.placeLatitude": latitude,
+            "activeMeetup.placeLongitude": longitude
+        ])
     }
 
     func voteCancelMeetup(projectId: String, uid: String) async {
-        do {
-            try await db.collection("projects").document(projectId)
-                .updateData(["activeMeetup.cancelVotes": FieldValue.arrayUnion([uid])])
-        } catch {
-            debugPrint("[Firestore] voteCancelMeetup error: \(error)")
-        }
+        await updateActiveMeetupIfExists(projectId: projectId, fields: [
+            "activeMeetup.cancelVotes": FieldValue.arrayUnion([uid])
+        ])
     }
 
     func joinMeetup(projectId: String, uid: String) async {
-        do {
-            try await db.collection("projects").document(projectId)
-                .updateData(["activeMeetup.attendeeIds": FieldValue.arrayUnion([uid])])
-        } catch {
-            debugPrint("[Firestore] joinMeetup error: \(error)")
-        }
+        await updateActiveMeetupIfExists(projectId: projectId, fields: [
+            "activeMeetup.attendeeIds": FieldValue.arrayUnion([uid])
+        ])
     }
 
     func updateMeetupLocation(projectId: String, location: MeetupMemberLocation) async {

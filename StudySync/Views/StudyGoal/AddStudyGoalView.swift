@@ -198,6 +198,12 @@ struct AddStudyGoalView: View {
             try modelContext.save()
             debugPrint("[StudyGoal] saved goal: \(goal.title)")
             StudyGoalSyncService.shared.pushGoal(goal)
+            // "3 goals at once" badge — count active, non-archived goals.
+            let descriptor = FetchDescriptor<StudyGoal>(
+                predicate: #Predicate { $0.isActive && !$0.isArchived }
+            )
+            let activeCount = (try? modelContext.fetchCount(descriptor)) ?? 0
+            Task { await BadgeService.checkGoalBadges(activeGoalCount: activeCount) }
         } catch {
             debugPrint("[StudyGoal] save error: \(error)")
         }

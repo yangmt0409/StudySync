@@ -205,16 +205,28 @@ final class AuthService: NSObject {
     // MARK: - Sign Out
 
     func signOut() {
-        // Clear FCM token before signing out
-        Task { await PushNotificationService.shared.clearToken() }
-        // Stop in-app notification listeners
+        // Capture the uid while still authenticated. The FCM-token removal is a
+        // Firestore write that is owner-gated, so it MUST complete *before* we
+        // tear down the auth session — the previous `Task { clearToken() }`
+        // raced Auth.signOut() (which nils currentUser synchronously), so
+        // clearToken read a nil uid and the token was never removed, leaving
+        // ghost pushes targeting the signed-out account.
+        let uid = Auth.auth().currentUser?.uid
         InAppNotificationManager.shared.stopListening()
-        do {
-            try Auth.auth().signOut()
-            currentUser = nil
-            userProfile = nil
-        } catch {
-            errorMessage = error.localizedDescription
+        Task { @MainActor in
+            if let uid {
+                // Bounded so a slow network can't hang sign-out indefinitely.
+                try? await withTimeout(seconds: 5) {
+                    await FirestoreService.shared.removeFCMToken(uid: uid)
+                }
+            }
+            do {
+                try Auth.auth().signOut()
+                currentUser = nil
+                userProfile = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -284,7 +296,15 @@ final class AuthService: NSObject {
             profile: loaded,
             storeKitPurchased: StoreManager.shared.isPurchasedPro
         )
-        userProfile = reconciled ?? loaded
+        // Guard against a stale in-flight load repopulating the profile after a
+        // concurrent sign-out (or an account switch) already cleared it.
+        guard Auth.auth().currentUser?.uid == uid else { return }
+        let profile = reconciled ?? loaded
+        userProfile = profile
+        // Hydrate the time-limited focus-challenge Pro reward from the server
+        // so it survives reinstall / second device — it's otherwise only ever
+        // read from local UserDefaults and would be lost.
+        await StoreManager.shared.hydrateRewardFromProfile(profile)
     }
 
     private func createProfileIfNeeded(uid: String, email: String, displayName: String, birthday: Date? = nil) async {

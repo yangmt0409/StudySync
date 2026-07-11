@@ -74,9 +74,12 @@ final class DeadlineBackgroundChecker {
         // Schedule the next refresh
         scheduleBackgroundRefresh()
 
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
+        // setTaskCompleted may be called at most ONCE per BGTask. The async
+        // work below and the expirationHandler race each other (the awaited
+        // travel refresh can outlast the BG budget), so funnel every
+        // completion through this guard — the first caller wins, the rest
+        // no-op. Calling setTaskCompleted twice raises an exception/crash.
+        let completion = BGCompletion(task)
 
         // CRITICAL: use the main app's container, not a fresh one.
         // Calling SharedModelContainer.create() here would open the same
@@ -85,21 +88,21 @@ final class DeadlineBackgroundChecker {
         // bug). See AppContainer.swift for the full writeup.
         guard let container = AppContainer.shared.container else {
             debugPrint("[BackgroundChecker] AppContainer not initialized — skipping refresh")
-            task.setTaskCompleted(success: false)
+            completion.finish(success: false)
             return
         }
         let context = ModelContext(container)
 
         let manager = CalendarManager.shared
         guard manager.authorizationStatus == .fullAccess else {
-            task.setTaskCompleted(success: true)
+            completion.finish(success: true)
             return
         }
 
         // Fetch records
         let descriptor = FetchDescriptor<DeadlineRecord>()
         guard let records = try? context.fetch(descriptor) else {
-            task.setTaskCompleted(success: true)
+            completion.finish(success: true)
             return
         }
 
@@ -111,14 +114,40 @@ final class DeadlineBackgroundChecker {
         // then complete the task. The BGAppRefreshTask has ~30s typically;
         // TravelStatusRefresher caps itself to events within 24h of departure
         // and rate-limits per-event, so this stays under budget.
-        Task { @MainActor in
+        let work = Task { @MainActor in
             UrgencyEngine.shared.update(
                 deadlineEvents: deadlineEvents,
                 completedIds: completedIds
             )
+            if Task.isCancelled { completion.finish(success: false); return }
             let travelContext = ModelContext(container)
             await TravelStatusRefresher.shared.refreshUpcoming(using: travelContext)
-            task.setTaskCompleted(success: true)
+            completion.finish(success: !Task.isCancelled)
         }
+
+        // If iOS reclaims us first, cancel the work and complete as failed.
+        task.expirationHandler = {
+            work.cancel()
+            completion.finish(success: false)
+        }
+    }
+}
+
+/// One-shot, thread-safe completion wrapper for a `BGTask`. Guarantees
+/// `setTaskCompleted` is invoked exactly once no matter how many code paths
+/// (async work, expiration handler) try to finish the task.
+private final class BGCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    private let task: BGTask
+
+    init(_ task: BGTask) { self.task = task }
+
+    func finish(success: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished else { return }
+        finished = true
+        task.setTaskCompleted(success: success)
     }
 }

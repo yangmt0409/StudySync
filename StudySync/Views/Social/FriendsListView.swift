@@ -310,6 +310,10 @@ struct FriendsListView: View {
         async let requestsTask = FirestoreService.shared.getFriendRequests(uid: uid)
         friends = await friendsTask
         requests = await requestsTask
+        // Friend badges key off the fresh count. Running here (not only on
+        // accept) also covers the REQUESTER's side, which only learns the
+        // friendship exists when this list loads.
+        await BadgeService.checkFriendBadges(friendCount: friends.count)
     }
 
     private func acceptRequest(_ request: FriendRequest) async {
@@ -317,12 +321,8 @@ struct FriendsListView: View {
               let profile = auth.userProfile else { return }
         await FirestoreService.shared.acceptFriendRequest(myUid: uid, myProfile: profile, request: request)
         HapticEngine.shared.lightImpact()
-
-        // Check badge: first friend
-        if friends.isEmpty {
-            await FirestoreService.shared.awardBadge(uid: uid, badgeId: "first_friend")
-        }
-
+        // loadData() refreshes the list and runs the friend-badge check
+        // (first_friend / social_5) against the post-accept count.
         await loadData()
     }
 

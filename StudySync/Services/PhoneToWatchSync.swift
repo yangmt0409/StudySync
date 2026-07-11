@@ -81,7 +81,13 @@ extension PhoneToWatchSync: WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        // Watch requested a sync — but we need a ModelContext
-        // This would be handled by the main app observing changes
+        // Watch requested a sync (it sends ["request": "sync"] on launch /
+        // foreground). WCSession delivers this on a background queue; hop to
+        // the main actor to reach the app's single shared ModelContainer.
+        guard message["request"] as? String == "sync" else { return }
+        Task { @MainActor in
+            guard let container = AppContainer.shared.container else { return }
+            self.syncEvents(from: ModelContext(container))
+        }
     }
 }

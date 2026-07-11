@@ -455,6 +455,12 @@ struct GroupFocusView: View {
                 // My controls (if I'm still focusing)
                 if let me = room.members.first(where: { $0.id == currentUid }), me.isFocusing {
                     Button {
+                        // Stop the local tick timer immediately — otherwise it
+                        // keeps running and, when it reaches 0, overwrites this
+                        // "gaveUp" with "completed" (crediting an abandoned
+                        // session a full 1.5x reward).
+                        roomTimer?.invalidate()
+                        roomTimer = nil
                         Task {
                             await firestore.updateGroupFocusMemberStatus(roomId: room.id, uid: currentUid ?? "", status: "gaveUp")
                         }
@@ -583,8 +589,11 @@ struct GroupFocusView: View {
         roomTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             tickCounter += 1
 
-            // Check if timer completed
-            if let room = currentRoom, room.remainingSeconds <= 0, room.isRunning {
+            // Check if timer completed. Only auto-complete if I'm still
+            // focusing — a member who gave up (or whose status moved on) must
+            // not be flipped back to "completed" by a surviving timer.
+            if let room = currentRoom, room.remainingSeconds <= 0, room.isRunning,
+               room.members.first(where: { $0.id == currentUid })?.isFocusing == true {
                 Task {
                     await firestore.updateGroupFocusMemberStatus(roomId: room.id, uid: currentUid ?? "", status: "completed")
                 }

@@ -1198,9 +1198,11 @@ struct FocusTimerView: View {
         guard isChallengeActive else { return }
         let store = StoreManager.shared
         guard !store.focusChallengeClaimedThisMonth else { return }
-        // Use foreground-only minutes; include just-completed session (query may lag)
-        let sessionFgMins = foregroundElapsedSeconds / 60
-        let effectiveMonthly = monthlyChallengeMinutes + sessionFgMins
+        // The just-completed session was inserted at startTimer() and had its
+        // foregroundSeconds mutated in-place before this call, so it's already
+        // summed into monthlyChallengeMinutes. Adding it again double-counted
+        // it and could trip the reward early.
+        let effectiveMonthly = monthlyChallengeMinutes
         guard effectiveMonthly >= challengeGoalMinutes else { return }
         store.grantFocusChallengeReward()
         showChallengeUnlocked = true

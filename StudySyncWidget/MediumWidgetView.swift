@@ -35,11 +35,16 @@ struct MediumWidgetView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
             }
 
-            let diffHours = abs(
+            // Use minute precision so half-hour / 45-min offset zones (India
+            // +5:30, Nepal +5:45) aren't truncated to a whole-hour difference.
+            let diffMinutes = abs(
                 settings.homeTimeZone.secondsFromGMT(for: entry.date)
                 - settings.studyTimeZone.secondsFromGMT(for: entry.date)
-            ) / 3600
-            Text("时差 \(diffHours)h")
+            ) / 60
+            let diffText = (diffMinutes % 60 == 0)
+                ? "\(diffMinutes / 60)h"
+                : "\(diffMinutes / 60)h\(diffMinutes % 60)m"
+            Text("时差 \(diffText)")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .padding(.horizontal, 6)

@@ -84,6 +84,15 @@ final class EventViewModel {
     }
 
     func addSampleEvents(context: ModelContext) {
+        // Starter content seeds at most ONCE per install. The call site guards
+        // on `events.isEmpty`, which is also true after a user deliberately
+        // deletes their last event — without this flag the samples silently
+        // resurrected on the next appear, looking like data the user never
+        // created (and undoing their cleanup).
+        let seededKey = "hasSeededSampleEvents"
+        guard !UserDefaults.standard.bool(forKey: seededKey) else { return }
+        UserDefaults.standard.set(true, forKey: seededKey)
+
         let calendar = Calendar.current
         let now = Date()
 

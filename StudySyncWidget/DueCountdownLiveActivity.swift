@@ -9,6 +9,10 @@ struct DueCountdownAttributes: ActivityAttributes {
     let emoji: String
     let dueDate: Date
     let calendarColorHex: String
+    /// Lead-time window (minutes) the activity was started with. Optional:
+    /// activities started by an older app build lack the field — fall back
+    /// to the legacy hardcoded 60 when rendering.
+    var leadMinutes: Int?
 
     struct ContentState: Codable, Hashable {
         let remainingSeconds: Int
@@ -49,7 +53,10 @@ struct DueCountdownLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     let dueDate = context.attributes.dueDate
-                    let progress = progressValue(dueDate: dueDate, leadMinutes: 60)
+                    // Progress renders against the user's actual lead-time
+                    // setting (15/30/60) — hardcoding 60 made a 15-min lead
+                    // start its bar at 75%.
+                    let progress = progressValue(dueDate: dueDate, leadMinutes: context.attributes.leadMinutes ?? 60)
                     VStack(spacing: 6) {
                         // Progress bar
                         GeometryReader { geo in
@@ -259,7 +266,9 @@ struct DueLockScreenView: View {
     }
 
     private var progressValue: Double {
-        let total: TimeInterval = 3600 // 1 hour
+        // Use the lead window the activity was actually started with; 60 is
+        // only the fallback for activities begun by a pre-field app build.
+        let total = TimeInterval((context.attributes.leadMinutes ?? 60) * 60)
         let remaining = context.attributes.dueDate.timeIntervalSinceNow
         let elapsed = total - remaining
         return min(max(elapsed / total, 0), 1)

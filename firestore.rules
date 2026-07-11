@@ -60,6 +60,26 @@ service cloud.firestore {
         );
     }
 
+    // proRewardExpiresAt backs UserProfile.isProActive() and is therefore a
+    // monetization-critical field. The client legitimately writes it when it
+    // grants the focus-challenge reward (a 3-month window), but without a
+    // bound a malicious client owning its own doc could set it to year-3000
+    // and self-grant permanent Pro — bypassing all the proLifetime hardening.
+    // We can't verify the challenge server-side from rules, so we cap the
+    // value at now + 100 days (the reward is ~3 months) to contain abuse.
+    function proRewardExpiresAtWriteAllowed() {
+      return
+        // unchanged, or explicitly cleared
+        fieldUnchanged('proRewardExpiresAt')
+        || !('proRewardExpiresAt' in request.resource.data)
+        // OR: a bounded forward grant (<= now + 100 days)
+        || (
+          request.resource.data.proRewardExpiresAt is timestamp
+          && request.resource.data.proRewardExpiresAt.toMillis()
+             <= request.time.toMillis() + 8640000000
+        );
+    }
+
     // ============================================================
     // Project membership helper
     // ============================================================
@@ -70,8 +90,32 @@ service cloud.firestore {
     // project's dues / activities / meetup data.
     function isProjectMember(projectId) {
       return request.auth != null
+        && exists(/databases/$(database)/documents/projects/$(projectId))
         && request.auth.uid in
            get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds;
+    }
+
+    // ============================================================
+    // Project document write guards
+    // ============================================================
+    // createdBy / createdAt / projectCode are immutable for the life of the
+    // project. Without pinning them, any member could rewrite createdBy to
+    // themselves (delete is gated on createdBy → ownership + cascade-delete
+    // takeover) or rotate the join code.
+    function projImmutableFieldsOK() {
+      return request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && fieldUnchanged('projectCode');
+    }
+    // The only legitimate memberIds mutations are: a non-member adding ONLY
+    // themselves (self-join) or a member removing ONLY themselves (self-leave).
+    // Everything else (meetup/meeting/meta edits) leaves memberIds untouched.
+    // This blocks mass-kick / non-member bulk-grant attacks.
+    function projAddedMembers()   { return request.resource.data.memberIds.removeAll(resource.data.memberIds); }
+    function projRemovedMembers() { return resource.data.memberIds.removeAll(request.resource.data.memberIds); }
+    function projMembershipDeltaSelfOnly() {
+      return (projAddedMembers().size() == 0 && projRemovedMembers().hasOnly([request.auth.uid]))
+          || (projRemovedMembers().size() == 0 && projAddedMembers().hasOnly([request.auth.uid]));
     }
 
     // User profiles - public read is required for friend-code lookup;
@@ -91,8 +135,17 @@ service cloud.firestore {
       allow update: if request.auth.uid == userId
                     && createdAtImmutable()
                     && proLifetimeWriteAllowed()
-                    && earlyBirdGrantedAtWriteAllowed();
+                    && earlyBirdGrantedAtWriteAllowed()
+                    && proRewardExpiresAtWriteAllowed();
       allow delete: if request.auth.uid == userId;
+
+      // Owner-only private data — FCM push token + locale live here instead
+      // of on the publicly readable user doc so other authed users can't
+      // harvest every user's push token / language. Cloud Functions read it
+      // via the Admin SDK (which bypasses rules).
+      match /private/{docId} {
+        allow read, write: if request.auth.uid == userId;
+      }
 
       // Friends subcollection. The friend graph is private to each owner
       // — neither side of a friendship should be able to enumerate the
@@ -100,27 +153,46 @@ service cloud.firestore {
       // end so reciprocal friend records work.
       match /friends/{friendId} {
         allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId
-                     || request.auth.uid == friendId;
+        // The owner fully manages their own friend list.
+        allow write: if request.auth.uid == userId;
+        // The reciprocal half of an accept writes into the OTHER party's list
+        // (auth.uid == friendId). Require that this party actually sent the
+        // owner a friend request — otherwise any user could force-add
+        // themselves into anyone's friends list by writing the reciprocal doc
+        // directly. The request doc id is the sender uid and carries fromUid,
+        // so we verify both exist and match.
+        allow create, update: if request.auth.uid == friendId
+                     && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(userId))
+                     && get(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(userId)).data.fromUid == userId;
+        // Either party may unfriend (deletes the reciprocal doc).
+        allow delete: if request.auth.uid == friendId;
       }
 
-      // Friend requests - recipient can read/delete, anyone authed can create
+      // Friend requests - recipient can read/delete. Create is open to any
+      // authed user BUT fromUid must equal the writer's own uid, so a sender
+      // can't be impersonated (the recipient renders fromName/fromEmoji).
       match /friendRequests/{requestId} {
         allow read: if request.auth.uid == userId;
-        allow create: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.fromUid == request.auth.uid;
         allow delete: if request.auth.uid == userId;
       }
 
-      // Nudges (拍一拍) - recipient can read/delete, any authed user can create
+      // Nudges (拍一拍) - recipient can read/delete. fromUid is pinned to the
+      // writer so a nudge can't claim to come from a third party.
       match /nudges/{nudgeId} {
         allow read, delete: if request.auth.uid == userId;
-        allow create: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.fromUid == request.auth.uid;
       }
 
-      // Ring nudges (响铃拍一拍) - same pattern as nudges
+      // Ring nudges (响铃拍一拍) - same pattern as nudges. Pinning fromUid is
+      // especially important here: the Cloud Function fires a DND-bypassing
+      // CRITICAL push, so the delivery confirmation must go to the real sender.
       match /ringNudges/{nudgeId} {
         allow read, delete: if request.auth.uid == userId;
-        allow create: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.fromUid == request.auth.uid;
       }
 
       // Shared dues - private to owner. Pre-1.0.3 this allowed any
@@ -215,9 +287,20 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null
                     && request.resource.data.hostUid == request.auth.uid;
+      // hostUid is pinned (no host seizure) and the only memberUids change a
+      // caller may make is adding or removing THEMSELVES. Status updates leave
+      // memberUids untouched. Previously any member — or a non-member who
+      // self-added — could rewrite the whole room and steal the host slot.
       allow update: if request.auth != null
+                    && request.resource.data.hostUid == resource.data.hostUid
                     && (request.auth.uid in resource.data.memberUids
-                        || request.auth.uid in request.resource.data.memberUids);
+                        || request.auth.uid in request.resource.data.memberUids)
+                    && (
+                         (request.resource.data.memberUids.removeAll(resource.data.memberUids).size() == 0
+                            && resource.data.memberUids.removeAll(request.resource.data.memberUids).hasOnly([request.auth.uid]))
+                      || (resource.data.memberUids.removeAll(request.resource.data.memberUids).size() == 0
+                            && request.resource.data.memberUids.removeAll(resource.data.memberUids).hasOnly([request.auth.uid]))
+                       );
       allow delete: if request.auth != null
                     && request.auth.uid == resource.data.hostUid;
     }
@@ -225,10 +308,20 @@ service cloud.firestore {
     // Team Projects - members can read, authed users can create/update
     match /projects/{projectId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      // Creator must stamp themselves as owner and be in the initial member
+      // list (no fabricating projects owned by / pre-populated with others).
+      allow create: if request.auth != null
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.auth.uid in request.resource.data.memberIds;
+      // Immutable createdBy/createdAt/projectCode + self-only membership delta.
+      // Closes the ownership-hijack / mass-kick / non-member-bulk-grant holes:
+      // the previous rule did NO field validation, so any member (or a
+      // non-member who added their own uid) could rewrite the entire doc.
       allow update: if request.auth != null
+                    && projImmutableFieldsOK()
                     && (request.auth.uid in resource.data.memberIds
-                        || request.auth.uid in request.resource.data.memberIds);
+                        || request.auth.uid in request.resource.data.memberIds)
+                    && projMembershipDeltaSelfOnly();
       allow delete: if request.auth != null
                     && request.auth.uid == resource.data.createdBy;
 

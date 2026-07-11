@@ -10,7 +10,10 @@ final class AvailabilityService {
     var isLoading = false
 
     private let firestore = FirestoreService.shared
-    private var saveTask: DispatchWorkItem?
+    /// Debounced save work items, keyed by date string. A single shared task
+    /// would let an edit to one day cancel a still-pending write for a
+    /// different day painted <0.5s earlier, silently dropping it.
+    private var saveTasks: [String: DispatchWorkItem] = [:]
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -193,14 +196,17 @@ final class AvailabilityService {
     // MARK: - Private
 
     private func debouncedSave(dateString: String, slots: String) {
-        saveTask?.cancel()
+        // Cancel/replace only the pending write for THIS day, so concurrent
+        // edits to different days don't clobber each other.
+        saveTasks[dateString]?.cancel()
         let task = DispatchWorkItem { [weak self] in
             guard let uid = AuthService.shared.currentUser?.uid else { return }
+            self?.saveTasks[dateString] = nil
             Task {
                 await self?.firestore.saveAvailability(uid: uid, dateString: dateString, slots: slots)
             }
         }
-        saveTask = task
+        saveTasks[dateString] = task
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
 

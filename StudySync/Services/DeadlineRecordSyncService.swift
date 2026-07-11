@@ -82,10 +82,14 @@ final class DeadlineRecordSyncService {
             // Index by eventIdentifier AND externalIdentifier so we can match
             // either — externalIdentifier is stable across devices.
             var byEventId: [String: DeadlineRecord] = [:]
-            var byExternalId: [String: DeadlineRecord] = [:]
+            // externalIdentifier is NOT unique (recurring events / copies share
+            // it), so collect candidates in a list. Matching by it is only safe
+            // when there's exactly one candidate — otherwise a remote doc would
+            // be applied to an arbitrary one, mutating the wrong record.
+            var byExternalId: [String: [DeadlineRecord]] = [:]
             for r in locals {
                 if !r.eventIdentifier.isEmpty { byEventId[r.eventIdentifier] = r }
-                if !r.externalIdentifier.isEmpty { byExternalId[r.externalIdentifier] = r }
+                if !r.externalIdentifier.isEmpty { byExternalId[r.externalIdentifier, default: []].append(r) }
             }
 
             for doc in snapshot.documents {
@@ -96,8 +100,13 @@ final class DeadlineRecordSyncService {
                 let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
                 let completedAt = (data["completedAt"] as? Timestamp)?.dateValue()
 
+                // Prefer the exact eventIdentifier match. Fall back to the
+                // externalIdentifier only when it maps to exactly one local
+                // record (ambiguous recurring-series matches are skipped and
+                // inserted fresh instead of clobbering the wrong record).
+                let externalCandidates = externalIdentifier.isEmpty ? [] : (byExternalId[externalIdentifier] ?? [])
                 let existing = byEventId[eventIdentifier]
-                    ?? (externalIdentifier.isEmpty ? nil : byExternalId[externalIdentifier])
+                    ?? (externalCandidates.count == 1 ? externalCandidates.first : nil)
 
                 if let existing {
                     existing.isCompleted = isCompleted

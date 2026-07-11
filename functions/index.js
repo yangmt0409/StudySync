@@ -203,48 +203,75 @@ function safeStr(value, fallback = "", maxLen = 80) {
 }
 
 /**
- * Read a single user's `locale` field from Firestore. Cached per Cloud
- * Function invocation via passed-in doc when caller already fetched the
- * user. Returns "zh-Hans" if the field is missing.
+ * Read a user's push profile (fcmToken + locale). These now live in the
+ * owner-only `users/{uid}/private/push` doc so other authenticated clients
+ * can't harvest everyone's push token. For clients that haven't migrated yet
+ * we fall back to the legacy fields still on the public user doc.
+ * Returns `{uid, token, locale}` (token may be null).
  */
-function localeFromDoc(docData) {
-  if (!docData) return "zh-Hans";
-  return docData.locale || "zh-Hans";
+async function getPushProfile(uid) {
+  let token = null;
+  let locale = "zh-Hans";
+  try {
+    const priv = await db.collection("users").doc(uid)
+      .collection("private").doc("push").get();
+    if (priv.exists) {
+      const d = priv.data() || {};
+      if (d.fcmToken) token = d.fcmToken;
+      if (d.locale) locale = d.locale;
+    }
+  } catch { /* fall through to legacy */ }
+
+  if (!token) {
+    // Legacy fallback: token/locale may still be on the public user doc.
+    try {
+      const doc = await db.collection("users").doc(uid).get();
+      if (doc.exists) {
+        const d = doc.data() || {};
+        if (d.fcmToken) token = d.fcmToken;
+        if (d.locale) locale = d.locale;
+      }
+    } catch { /* ignore */ }
+  }
+  return { uid, token, locale };
 }
 
 async function fetchLocale(uid) {
+  const p = await getPushProfile(uid);
+  return p.locale || "zh-Hans";
+}
+
+/**
+ * Read the receiver's friend record for `senderUid`
+ * (`users/{receiverUid}/friends/{senderUid}`). Returns the data, or null if
+ * they aren't friends. Nudges/ring-nudges are friend-only; verifying this
+ * server-side stops a client from spamming/impersonating arbitrary users
+ * (the security rules can't do this cross-document lookup cheaply).
+ */
+async function getFriendRecord(receiverUid, senderUid) {
   try {
-    const doc = await db.collection("users").doc(uid).get();
-    return localeFromDoc(doc.exists ? doc.data() : null);
+    const doc = await db.collection("users").doc(receiverUid)
+      .collection("friends").doc(senderUid).get();
+    return doc.exists ? (doc.data() || {}) : null;
   } catch {
-    return "zh-Hans";
+    return null;
   }
 }
 
 /**
- * Batch-fetch FCM tokens AND locale per UID in a single Firestore round.
- * Returns `[{uid, token, locale}]`. Used by `sendLocalizedNotification` to
- * group recipients by locale before sending FCM.
+ * Fetch `{uid, token, locale}` for each UID, dropping anyone without a token.
+ * Used by `sendLocalizedNotification` to group recipients by locale, and the
+ * `{uid, token}` pairing lets invalid-token cleanup target the right doc.
  */
 async function getRecipients(uids) {
-  const recipients = [];
-  for (let i = 0; i < uids.length; i += 10) {
-    const batch = uids.slice(i, i + 10);
-    const snapshot = await db.collection("users")
-      .where("__name__", "in", batch).get();
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      const token = data.fcmToken;
-      if (token) {
-        recipients.push({
-          uid: doc.id,
-          token,
-          locale: data.locale || "zh-Hans",
-        });
-      }
-    }
-  }
-  return recipients;
+  const profiles = await Promise.all(uids.map((uid) => getPushProfile(uid)));
+  return profiles.filter((p) => p.token);
+}
+
+/** Fetch `[{uid, token}]` pairs for the given UIDs (token present only). */
+async function getTokenPairs(uids) {
+  const recipients = await getRecipients(uids);
+  return recipients.map((r) => ({ uid: r.uid, token: r.token }));
 }
 
 /**
@@ -263,15 +290,15 @@ async function sendLocalizedNotification({
   const recipients = await getRecipients(uids);
   if (recipients.length === 0) return 0;
 
-  // Group recipients by locale
+  // Group recipients by locale (carry uid alongside token for cleanup)
   const byLocale = {};
   for (const r of recipients) {
     if (!byLocale[r.locale]) byLocale[r.locale] = [];
-    byLocale[r.locale].push(r.token);
+    byLocale[r.locale].push({ uid: r.uid, token: r.token });
   }
 
   let totalSent = 0;
-  for (const [locale, tokens] of Object.entries(byLocale)) {
+  for (const [locale, pairs] of Object.entries(byLocale)) {
     const localizedTitle = title != null
       ? title
       : localize(titleKey, locale, params);
@@ -283,7 +310,7 @@ async function sendLocalizedNotification({
       data: dataPayload || {},
       ...(apnsOverrides ? { apns: apnsOverrides } : {}),
     };
-    totalSent += await sendToTokens(tokens, message);
+    totalSent += await sendToTokens(pairs, message);
   }
   return totalSent;
 }
@@ -418,10 +445,19 @@ exports.onProjectMemberJoined = onDocumentUpdated(
     const newMemberIds = after.memberIds.filter((uid) => !before.memberIds.includes(uid));
     if (newMemberIds.length === 0) return;
 
-    // Find new member profiles
-    const newMembers = (after.memberProfiles || []).filter((m) => m && newMemberIds.includes(m.id));
+    // Resolve the announced name(s) from the authoritative users doc rather
+    // than the client-written memberProfiles array (which any member could
+    // forge). Skip UIDs with no real profile so a fabricated UID can't inject
+    // attacker-chosen text into everyone's push.
+    const newMemberDocs = await Promise.all(
+      newMemberIds.map((uid) => db.collection("users").doc(uid).get())
+    );
     const newMemberName = safeStr(
-      newMembers.map((m) => m.displayName).filter(Boolean).join(", "),
+      newMemberDocs
+        .filter((d) => d.exists)
+        .map((d) => (d.data() || {}).displayName)
+        .filter(Boolean)
+        .join(", "),
       "New member",
       60
     );
@@ -505,7 +541,14 @@ exports.scheduledDeadlineReminder = onSchedule(
         .get();
 
       for (const dueDoc of duesSnapshot.docs) {
+       try {
         const due = dueDoc.data();
+        // A malformed/legacy due (member-writable, rules don't validate the
+        // field) can have a missing or non-Timestamp dueDate. Without this
+        // guard `undefined.toDate()` throws, aborting the ENTIRE scheduled run
+        // — every later project gets no reminder and the Scheduler retry
+        // re-notifies everyone already processed (duplicate storm).
+        if (!due.dueDate || typeof due.dueDate.toDate !== "function") continue;
         const dueDate = due.dueDate.toDate();
 
         // Pick the right localized body key + days param based on urgency.
@@ -560,6 +603,10 @@ exports.scheduledDeadlineReminder = onSchedule(
           },
         });
         if (sent > 0) notificationCount++;
+       } catch (err) {
+        // One bad due must never abort the whole scheduled run.
+        console.error(`[Scheduler] skipped due ${projectDoc.id}/${dueDoc.id}:`, err);
+       }
       }
     }
 
@@ -581,11 +628,20 @@ exports.onNudgeSent = onDocumentCreated(
     const senderName = safeStr(nudge.fromName, "Someone", 40);
     const senderEmoji = safeStr(nudge.fromEmoji, "👋", 8);
 
+    // Server-side relationship check: only deliver between actual friends.
+    // (fromUid is pinned to the writer by security rules, so senderUid is
+    // trustworthy.) This stops non-friend nudge spam and prevents the
+    // delivery confirmation from leaking the receiver's name/emoji.
+    if (!(await getFriendRecord(receiverUid, senderUid))) {
+      console.log(`[Nudge] sender not a friend, skipping`);
+      return;
+    }
+
     // 1) Send nudge notification to receiver in their preferred locale.
     const receiverDoc = await db.collection("users").doc(receiverUid).get();
     const receiverData = receiverDoc.exists ? receiverDoc.data() : null;
-    const receiverLocale = localeFromDoc(receiverData);
-    const receiverTokens = await getFCMTokens([receiverUid]);
+    const receiverLocale = await fetchLocale(receiverUid);
+    const receiverTokens = await getTokenPairs([receiverUid]);
     if (receiverTokens.length > 0) {
       const receiverMessage = {
         notification: {
@@ -608,7 +664,7 @@ exports.onNudgeSent = onDocumentCreated(
           || localize("friend_fallback", senderLocale);
         const receiverEmoji = safeStr(receiverData?.avatarEmoji, "", 8);
 
-        const senderTokens = await getFCMTokens([senderUid]);
+        const senderTokens = await getTokenPairs([senderUid]);
         if (senderTokens.length > 0) {
           const confirmMessage = {
             notification: {
@@ -644,11 +700,40 @@ exports.onRingNudgeSent = onDocumentCreated(
     const senderName = safeStr(nudge.fromName, "Someone", 40);
     const senderEmoji = safeStr(nudge.fromEmoji, "🔔", 8);
 
+    // A ring nudge fires a DND-bypassing CRITICAL push, so it MUST be
+    // authorized server-side — the client gate is not a trust boundary.
+    // Require: (1) sender is an actual friend, and (2) the receiver has
+    // explicitly allowed ring-nudges from this sender (allowRingNudge).
+    const friend = await getFriendRecord(receiverUid, senderUid);
+    if (!friend || friend.allowRingNudge !== true) {
+      console.log(`[RingNudge] not authorized (friend/allowRingNudge), skipping`);
+      return;
+    }
+
+    // Rate-limit: at most one ring nudge per sender→receiver per cooldown
+    // window. `ringNudgeCooldowns` has no client rules (default-deny) so only
+    // the Admin SDK can touch it.
+    const RING_COOLDOWN_MS = 60 * 1000;
+    const cooldownRef = db.collection("ringNudgeCooldowns").doc(`${senderUid}_${receiverUid}`);
+    try {
+      const cd = await cooldownRef.get();
+      const lastAt = cd.exists && cd.data().at ? cd.data().at.toMillis() : 0;
+      if (Date.now() - lastAt < RING_COOLDOWN_MS) {
+        console.log(`[RingNudge] rate-limited, skipping`);
+        return;
+      }
+      await cooldownRef.set({
+        at: require("firebase-admin/firestore").FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      console.error(`[RingNudge] cooldown check error:`, e);
+    }
+
     // 1) Send critical notification to receiver in their locale.
     const receiverDoc = await db.collection("users").doc(receiverUid).get();
     const receiverData = receiverDoc.exists ? receiverDoc.data() : null;
-    const receiverLocale = localeFromDoc(receiverData);
-    const receiverTokens = await getFCMTokens([receiverUid]);
+    const receiverLocale = await fetchLocale(receiverUid);
+    const receiverTokens = await getTokenPairs([receiverUid]);
     if (receiverTokens.length > 0) {
       const receiverMessage = {
         notification: {
@@ -680,7 +765,7 @@ exports.onRingNudgeSent = onDocumentCreated(
         const receiverName = safeStr(receiverData?.displayName, "", 40)
           || localize("friend_fallback", senderLocale);
 
-        const senderTokens = await getFCMTokens([senderUid]);
+        const senderTokens = await getTokenPairs([senderUid]);
         if (senderTokens.length > 0) {
           const confirmMessage = {
             notification: {
@@ -703,37 +788,16 @@ exports.onRingNudgeSent = onDocumentCreated(
 );
 
 // ============================================================
-// Helper: Get FCM tokens for UIDs
+// Helper: Send FCM to multiple recipients (handles invalid tokens)
 // ============================================================
-async function getFCMTokens(uids) {
-  const tokens = [];
-  // Batch read in groups of 10 (Firestore IN query limit)
-  for (let i = 0; i < uids.length; i += 10) {
-    const batch = uids.slice(i, i + 10);
-    const snapshot = await db
-      .collection("users")
-      .where("__name__", "in", batch)
-      .get();
+// Accepts `[{uid, token}]` pairs so an invalid-token response can be cleaned
+// up by deleting the exact owner's push doc — no cross-collection query.
+async function sendToTokens(pairs, messageTemplate) {
+  if (pairs.length === 0) return 0;
 
-    for (const doc of snapshot.docs) {
-      const token = doc.data().fcmToken;
-      if (token) {
-        tokens.push(token);
-      }
-    }
-  }
-  return tokens;
-}
-
-// ============================================================
-// Helper: Send FCM to multiple tokens (handles invalid tokens)
-// ============================================================
-async function sendToTokens(tokens, messageTemplate) {
-  if (tokens.length === 0) return 0;
-
-  const messages = tokens.map((token) => ({
+  const messages = pairs.map((p) => ({
     ...messageTemplate,
-    token: token,
+    token: p.token,
   }));
 
   try {
@@ -751,13 +815,13 @@ async function sendToTokens(tokens, messageTemplate) {
           // 20-char prefix is enough material to aid token enumeration
           // attacks if the logs are ever exposed.
           console.log(`[FCM] Removing invalid token`);
-          removeInvalidToken(tokens[idx]);
+          removeInvalidToken(pairs[idx].uid);
         }
       }
     });
 
     const successCount = response.responses.filter((r) => r.success).length;
-    console.log(`[FCM] Sent ${successCount}/${tokens.length} messages`);
+    console.log(`[FCM] Sent ${successCount}/${pairs.length} messages`);
     return successCount;
   } catch (error) {
     console.error("[FCM] sendEach error:", error);
@@ -768,21 +832,23 @@ async function sendToTokens(tokens, messageTemplate) {
 // ============================================================
 // Helper: Remove invalid FCM token from Firestore
 // ============================================================
-async function removeInvalidToken(token) {
+// Clears the token from the owner-only private push doc and, for safety,
+// the legacy fields that may still live on the public user doc.
+async function removeInvalidToken(uid) {
+  if (!uid) return;
+  const { FieldValue } = require("firebase-admin/firestore");
   try {
-    const snapshot = await db
-      .collection("users")
-      .where("fcmToken", "==", token)
-      .limit(1)
-      .get();
-
-    if (!snapshot.empty) {
-      await snapshot.docs[0].ref.update({
-        fcmToken: require("firebase-admin/firestore").FieldValue.delete(),
-        fcmTokenUpdatedAt: require("firebase-admin/firestore").FieldValue.delete(),
-      });
-    }
+    await db.collection("users").doc(uid).collection("private").doc("push").set({
+      fcmToken: FieldValue.delete(),
+      fcmTokenUpdatedAt: FieldValue.delete(),
+    }, { merge: true });
   } catch (error) {
-    console.error("[FCM] removeInvalidToken error:", error);
+    console.error("[FCM] removeInvalidToken (private) error:", error);
   }
+  try {
+    await db.collection("users").doc(uid).update({
+      fcmToken: FieldValue.delete(),
+      fcmTokenUpdatedAt: FieldValue.delete(),
+    });
+  } catch { /* legacy fields may already be gone */ }
 }

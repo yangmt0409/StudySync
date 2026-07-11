@@ -216,6 +216,20 @@ final class StoreManager {
 
     // MARK: - Focus Challenge Reward
 
+    /// Restore the time-limited focus-challenge Pro reward from the server-side
+    /// profile. `proRewardExpiresAt` is otherwise only ever loaded from local
+    /// UserDefaults, so on a reinstall / second device the reward the user
+    /// earned would be lost even though it's recorded in Firestore. Take the
+    /// later of local vs remote so a stale device never shortens an active
+    /// reward, and persist locally so the gate survives offline launches.
+    @MainActor
+    func hydrateRewardFromProfile(_ profile: UserProfile?) {
+        guard let remote = profile?.proRewardExpiresAt,
+              remote > (proRewardExpiresAt ?? .distantPast) else { return }
+        proRewardExpiresAt = remote
+        UserDefaults.standard.set(remote, forKey: proRewardKey)
+    }
+
     /// Grant 3 months of Pro for completing the monthly 100 h focus challenge.
     @MainActor
     func grantFocusChallengeReward() {

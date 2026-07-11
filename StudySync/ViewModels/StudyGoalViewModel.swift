@@ -33,6 +33,13 @@ final class StudyGoalViewModel {
     func checkIn(goal: StudyGoal, context: ModelContext) {
         guard goal.needsCheckIn else { return }
 
+        // Capture the count BEFORE inserting, then add exactly one. Reading
+        // `goal.totalCheckIns + 1` after the save double-counts when SwiftData
+        // has already propagated the new record into the relationship,
+        // overshooting the milestone (which matches on exact equality) and
+        // skipping the celebration entirely.
+        let preInsertCount = goal.totalCheckIns
+
         let record = CheckInRecord(date: Date())
         record.goal = goal
         context.insert(record)
@@ -42,7 +49,7 @@ final class StudyGoalViewModel {
         StudyGoalSyncService.shared.pushCheckIn(record, goalId: goal.id)
 
         // Check milestone after adding
-        let newCount = goal.totalCheckIns + 1 // +1 because relationship may not update instantly
+        let newCount = preInsertCount + 1
         if let milestone = Milestone.reached(count: newCount, frequency: goal.frequency) {
             celebrationGoal = goal
             celebrationMilestone = milestone
@@ -108,6 +115,11 @@ final class StudyGoalViewModel {
         Task {
             await FirestoreService.shared.updateStats(
                 uid: uid,
+                totalCheckIns: totalCheckIns,
+                longestStreak: longestStreak
+            )
+            // Check-in / streak badges unlock off these same aggregates.
+            await BadgeService.checkCheckInBadges(
                 totalCheckIns: totalCheckIns,
                 longestStreak: longestStreak
             )

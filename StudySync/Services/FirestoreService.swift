@@ -576,7 +576,13 @@ final class FirestoreService {
                 }
                 guard var room = try? doc.data(as: GroupFocusRoom.self) else { return nil }
                 if let idx = room.members.firstIndex(where: { $0.id == uid }) {
-                    room.members[idx].status = status
+                    // "gaveUp" and "completed" are terminal — never let a later
+                    // write (e.g. a stray client tick timer) flip a member who
+                    // already gave up into "completed" and credit the reward.
+                    let current = room.members[idx].status
+                    if current != "gaveUp" && current != "completed" {
+                        room.members[idx].status = status
+                    }
                 }
                 let allDone = room.members.allSatisfy { $0.status == "completed" || $0.status == "gaveUp" }
                 var updates: [String: Any] = [:]

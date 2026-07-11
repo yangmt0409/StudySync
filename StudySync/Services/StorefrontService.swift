@@ -14,8 +14,14 @@ enum StorefrontService {
     /// locale so the check works before the first `refresh()` call finishes.
     static var isChina: Bool {
         if let cached = cachedIsChina { return cached }
-        let regionCode = Locale.current.region?.identifier ?? Locale.current.identifier
-        return regionCode == "CN"
+        // Prefer the structured region code ("CN"). When that's unavailable the
+        // old fallback compared the FULL locale identifier (e.g. "zh_CN") against
+        // "CN" and never matched — so parse the region out of the identifier.
+        if let region = Locale.current.region?.identifier {
+            return region == "CN"
+        }
+        let identifier = Locale.current.identifier
+        return identifier == "CN" || identifier.hasSuffix("_CN") || identifier.hasSuffix("-CN")
     }
 
     /// Call once at app launch (and on storefront change if you subscribe to updates)

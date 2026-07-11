@@ -25,6 +25,7 @@ struct AddEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Query private var settingsArray: [UserSettings]
 
     var editingEvent: CountdownEvent?
 
@@ -99,6 +100,11 @@ struct AddEventView: View {
                     notifyEnabled = event.notifyEnabled
                     isExam = event.isExam
                     reviewRemindersEnabled = event.reviewRemindersEnabled
+                } else if let settings = settingsArray.first {
+                    // New event: start from the user's "默认分类" setting —
+                    // previously ignored (always .academic), making the
+                    // settings picker a no-op.
+                    category = settings.defaultCategory
                 }
             }
         }

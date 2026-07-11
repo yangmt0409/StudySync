@@ -129,9 +129,15 @@ struct WidgetSettingsData {
 
 struct WidgetDataProvider {
 
+    /// Open the shared SQLite store ONCE per widget-extension process. Building
+    /// a fresh ModelContainer on every fetch (the timeline provider calls these
+    /// helpers ~a dozen times per timeline build) reopened the store each time,
+    /// which is the slowest part of the timeline build. A ModelContext created
+    /// from the cached container still reads live store state on each fetch.
+    private static let sharedContainer: ModelContainer = SharedModelContainer.create()
+
     static func fetchEvents(limit: Int? = nil) -> [WidgetEventData] {
-        let container = SharedModelContainer.create()
-        let context = ModelContext(container)
+        let context = ModelContext(sharedContainer)
 
         let descriptor = FetchDescriptor<CountdownEvent>(
             sortBy: [SortDescriptor(\.endDate, order: .forward)]
@@ -181,8 +187,7 @@ struct WidgetDataProvider {
     }
 
     static func fetchSettings() -> WidgetSettingsData {
-        let container = SharedModelContainer.create()
-        let context = ModelContext(container)
+        let context = ModelContext(sharedContainer)
 
         let descriptor = FetchDescriptor<UserSettings>()
 

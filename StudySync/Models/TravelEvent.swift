@@ -211,18 +211,22 @@ final class TravelEvent {
         return "\(mins)m"
     }
 
-    /// True if origin and destination are in different countries (heuristic:
-    /// different IANA timezone countries). Used to auto-pick international
-    /// flight reminder preset.
+    /// True if origin and destination are likely in different countries. Used
+    /// to auto-pick the international flight reminder preset.
+    ///
+    /// Heuristic: compare the FULL IANA timezone identifiers, not just the
+    /// continent prefix. The old prefix-only check (`Asia`, `Europe`, ...)
+    /// collapsed Beijing→Tokyo and Paris→London to "domestic" and gave genuine
+    /// international trips the later/fewer domestic reminders — the dangerous
+    /// failure mode (missing visa / international check-in lead time). Comparing
+    /// full zones biases toward the international (earlier) preset whenever the
+    /// zones differ, which is the safe direction. (A small number of
+    /// multi-timezone domestic flights, e.g. within the US, will over-remind.)
     var isInternational: Bool {
         guard kind == .flight else { return false }
-        let depCountry = (Locale.Region(departureTimeZone.identifier.split(separator: "/").first.map(String.init) ?? ""))
-        let arrCountry = (Locale.Region(arrivalTimeZone.identifier.split(separator: "/").first.map(String.init) ?? ""))
-        // Falls back to string compare of zone regions
-        _ = depCountry; _ = arrCountry
-        let depRegion = departureTimeZone.identifier.split(separator: "/").first.map(String.init) ?? ""
-        let arrRegion = arrivalTimeZone.identifier.split(separator: "/").first.map(String.init) ?? ""
-        return depRegion != arrRegion && !depRegion.isEmpty && !arrRegion.isEmpty
+        let dep = departureTimeZone.identifier
+        let arr = arrivalTimeZone.identifier
+        return !dep.isEmpty && !arr.isEmpty && dep != arr
     }
 
     /// True if departure is still in the future (from now).

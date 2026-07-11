@@ -453,6 +453,7 @@ struct SocialHubView: View {
                     auth.userProfile?.shareEnabled = newValue
                     Task {
                         await FirestoreService.shared.updateShareEnabled(uid: profile.id, enabled: newValue)
+                        await BadgeService.checkTeamPlayerBadge(shareEnabled: newValue)
                     }
                 }
             ))

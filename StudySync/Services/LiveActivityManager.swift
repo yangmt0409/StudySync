@@ -56,7 +56,8 @@ final class LiveActivityManager {
             eventTitle: event.title ?? "Due",
             emoji: emoji,
             dueDate: event.startDate,
-            calendarColorHex: hex
+            calendarColorHex: hex,
+            leadMinutes: liveActivityLeadMinutes
         )
 
         let remaining = Int(event.startDate.timeIntervalSinceNow)

@@ -48,6 +48,13 @@ final class TeamProjectViewModel {
     private var activitiesListener: ListenerRegistration?
     private var meetupLocationsListener: ListenerRegistration?
 
+    /// Meetup ids this device has already begun ending. The project snapshot
+    /// listener fires on EVERY doc change, and until the `activeMeetup = nil`
+    /// write lands each snapshot still satisfies the auto-end / cancel-vote
+    /// conditions — without this guard a single device queued a duplicate
+    /// endMeetup per snapshot (duplicate archives + activity entries).
+    private var endingMeetupIds = Set<String>()
+
     enum DueFilter: String, CaseIterable {
         case all
         case mine
@@ -303,9 +310,14 @@ final class TeamProjectViewModel {
             // tapped "End meetup", clean it up now. We tag the activity
             // log with `auto` so the post-mortem reads "ended
             // automatically" instead of pretending a member did it.
+            // `endingMeetupIds` makes this fire once per meetup per device;
+            // cross-device duplicates collapse because both the archive doc
+            // and the activity entry use the meetup id as document id.
             if let meetup = updated.activeMeetup,
                Date().timeIntervalSince(meetup.meetupTime) > MeetupLocationService.autoEndDelay {
-                Task { [weak self] in await self?.autoEndMeetup(meetup) }
+                if self.endingMeetupIds.insert(meetup.id).inserted {
+                    Task { [weak self] in await self?.autoEndMeetup(meetup) }
+                }
                 return
             }
 
@@ -358,9 +370,19 @@ final class TeamProjectViewModel {
                 }
             }
 
-            // Cancel vote threshold reached → auto-end meetup
-            if let meetup = updated.activeMeetup, meetup.cancelThresholdReached {
-                Task { [weak self] in await self?.endMeetup() }
+            // Cancel vote threshold reached → auto-end meetup. Previously
+            // EVERY member's device fired endMeetup() on EVERY snapshot —
+            // duplicate archives and duplicate "meetup ended" timeline
+            // entries. Designate a single deterministic actor instead: the
+            // last voter (whose vote crossed the threshold — guaranteed
+            // online) with the meetup creator as backup. Everyone else just
+            // waits for the `activeMeetup = nil` fanout.
+            if let meetup = updated.activeMeetup, meetup.cancelThresholdReached,
+               let uid = self.auth.currentUser?.uid,
+               meetup.cancelVotes.last == uid || meetup.createdBy == uid {
+                if self.endingMeetupIds.insert(meetup.id).inserted {
+                    Task { [weak self] in await self?.endMeetup() }
+                }
             }
         }
 
@@ -627,7 +649,11 @@ final class TeamProjectViewModel {
         await firestore.archiveMeetup(projectId: projectId, meetup: meetup, autoEnded: false)
         await firestore.endMeetup(projectId: projectId)
         stopMeetupLocationsListener()
-        logActivity(type: .meetupEnded, detail: "\(meetup.title) @ \(meetup.placeName)")
+        // Deterministic id: a meetup ends once, so even if two devices race
+        // to end it the timeline gets a single entry (last write wins).
+        logActivity(type: .meetupEnded,
+                    detail: "\(meetup.title) @ \(meetup.placeName)",
+                    id: "meetup_ended_\(meetup.id)")
     }
 
     /// Listener-triggered auto-end after the meetup has been past its
@@ -642,7 +668,11 @@ final class TeamProjectViewModel {
         await firestore.archiveMeetup(projectId: projectId, meetup: meetup, autoEnded: true)
         await firestore.endMeetup(projectId: projectId)
         stopMeetupLocationsListener()
-        logActivity(type: .meetupEnded, detail: "\(meetup.title) @ \(meetup.placeName) (自动结束)")
+        // Same deterministic id as endMeetup — cross-device races collapse
+        // to one timeline entry.
+        logActivity(type: .meetupEnded,
+                    detail: "\(meetup.title) @ \(meetup.placeName) (自动结束)",
+                    id: "meetup_ended_\(meetup.id)")
     }
 
     var isInMeetup: Bool {
@@ -653,10 +683,13 @@ final class TeamProjectViewModel {
 
     // MARK: - Activity Logging
 
-    private func logActivity(type: ProjectActivity.ActivityType, detail: String = "") {
+    /// - Parameter id: pass a deterministic id for events that must appear at
+    ///   most once (e.g. `meetup_ended_<meetupId>`); defaults to a fresh UUID.
+    private func logActivity(type: ProjectActivity.ActivityType, detail: String = "", id: String = UUID().uuidString) {
         guard let projectId = currentProject?.id,
               let profile = auth.userProfile else { return }
         let activity = ProjectActivity(
+            id: id,
             type: type,
             actorUid: profile.id,
             actorName: profile.displayName,

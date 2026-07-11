@@ -104,7 +104,14 @@ final class AIUsageService {
             debugLog("❌ Failed to fetch /api/organizations (see trace above)")
             return
         }
+        // The /organizations body carries PII (org name = user's real name,
+        // billing_email, member metadata). The debug log is shown verbatim in
+        // the UI with a one-tap copy button, so only dump the raw body in DEBUG.
+        #if DEBUG
         debugLog("📦 orgs response (\(orgsJSON.count) chars):\n\(orgsJSON.prefix(1500))")
+        #else
+        debugLog("📦 orgs response (\(orgsJSON.count) chars)")
+        #endif
 
         // Detect Claude API error envelope {"type":"error", ...}
         if orgsJSON.contains("\"type\":\"error\"") || orgsJSON.contains("account_session_invalid") {
@@ -128,7 +135,9 @@ final class AIUsageService {
             account.planName = plan
         }
         debugLog("✅ org: \(orgId), plan: \(account.planName ?? "nil")")
+        #if DEBUG
         debugLog("🔑 org keys: \(Array(org.keys).sorted().joined(separator: ", "))")
+        #endif
 
         // Step 2: Fetch usage (reuses the same captured webView)
         let usageURL = URL(string: "https://claude.ai/api/organizations/\(orgId)/usage")!
@@ -139,7 +148,11 @@ final class AIUsageService {
             debugLog("❌ Failed to fetch /usage (see trace above)")
             return
         }
+        #if DEBUG
         debugLog("📦 usage response (\(usageJSON.count) chars):\n\(usageJSON.prefix(2000))")
+        #else
+        debugLog("📦 usage response (\(usageJSON.count) chars)")
+        #endif
 
         guard let usageData = usageJSON.data(using: .utf8),
               let usageObj = try? JSONSerialization.jsonObject(with: usageData) as? [String: Any] else {

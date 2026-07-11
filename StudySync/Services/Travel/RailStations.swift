@@ -40,7 +40,7 @@ enum RailStations {
         // Yangtze River Delta
         .init(nameZh: "杭州东", nameEn: "Hangzhou East", code: "HGH", city: "杭州"),
         .init(nameZh: "杭州", nameEn: "Hangzhou", code: "HZH", city: "杭州"),
-        .init(nameZh: "南京南", nameEn: "Nanjing South", code: "NJH", city: "南京"),
+        .init(nameZh: "南京南", nameEn: "Nanjing South", code: "NKH", city: "南京"),
         .init(nameZh: "南京", nameEn: "Nanjing", code: "NJH", city: "南京"),
         .init(nameZh: "苏州", nameEn: "Suzhou", code: "SZH", city: "苏州"),
         .init(nameZh: "无锡", nameEn: "Wuxi", code: "WXH", city: "无锡"),

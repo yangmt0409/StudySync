@@ -113,6 +113,10 @@ final class MeetupLocationService: NSObject {
         myWalkingETA = nil
         projectId = nil
         destination = nil
+        // Reset the sharing toggle to its default so the choice from one meetup
+        // doesn't silently carry over to an unrelated meetup later. (The default
+        // of `true` = opt-out is a deliberate product decision — see line 25.)
+        isSharingLocation = true
 
         // End Live Activity
         endLiveActivity()

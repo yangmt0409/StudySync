@@ -125,7 +125,12 @@ final class WatchSyncManager: NSObject {
             events = cached
         }
 
-        // Add sample events if empty (for testing without iPhone)
+        // Seed sample events ONLY in DEBUG builds (for previewing the watch UI
+        // without a paired iPhone). In production these fabricated countdowns
+        // would otherwise be shown to real users whenever the cache is empty —
+        // unrelated to anything they actually created. Production shows the
+        // real empty-state instead.
+        #if DEBUG
         if events.isEmpty {
             events = [
                 WatchEvent(id: UUID(), title: "期末考试周", emoji: "📝",
@@ -142,6 +147,7 @@ final class WatchSyncManager: NSObject {
                           categoryName: "签证", colorHex: "#FF6B6B", isPinned: false),
             ]
         }
+        #endif
     }
 }
 
